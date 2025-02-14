@@ -4,6 +4,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
+import { useNavigation } from '@react-navigation/native';
 
 const BASE_URL = 'http://13.49.68.11:3000';
 
@@ -24,7 +25,8 @@ const BackgroundPattern = () => (
   </View>
 );
 
-function LoginScreen({ navigation }) {
+function LoginScreen() {
+  const navigation = useNavigation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [keepSignedIn, setKeepSignedIn] = useState(false);
@@ -104,10 +106,7 @@ function LoginScreen({ navigation }) {
         setLoading(false);
 
         // Navigate to Home screen
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Home' }]
-        });
+        navigation.replace("Home")
       } else {
         // Handle unexpected response structure
         throw new Error('Invalid login response');

@@ -19,7 +19,7 @@ const BottomNavBar = () => {
     {
       name: 'Collections',
       icon: require('../assets/images/Nav/Collection.png'),
-      route: 'Collections'
+      route: 'Collections'  // Ensure this matches the screen name
     },
     {
       name: 'Add',
@@ -28,9 +28,9 @@ const BottomNavBar = () => {
       isCenter: true
     },
     {
-      name: 'Space',
+      name: 'Spaces',
       icon: require('../assets/images/Nav/Spaces.png'),
-      route: 'Space'
+      route: 'Spaces'
     },
     {
       name: 'Profile',

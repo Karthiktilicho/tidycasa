@@ -117,13 +117,18 @@ export const AuthProvider = ({ children }) => {
 
   const signIn = async (response) => {
     try {
-      if (!response || !response.data || response.data.status !== 'success') {
-        throw new Error('Invalid login response');
-      }
+      console.log("sign in Tidycasass",{response})
+ 
+      console.log("getting token");
+      const responseDummy =  {
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxMywiZW1haWwiOiJrYXJ0aGlrdGVzdEBnbWFpbC5jb20iLCJ1c2VybmFtZSI6ImthcnRoaWt0ZXN0IiwiaWF0IjoxNzM5NTEyODQ1LCJleHAiOjE3Mzk1OTkyNDV9.8zMBD9wjDdsZAX92tyTF0aJ4MB-AhbcFp_YANZ7J2Yw",
+        "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxMywiZW1haWwiOiJrYXJ0aGlrdGVzdEBnbWFpbC5jb20iLCJ1c2VybmFtZSI6ImthcnRoaWt0ZXN0IiwiaWF0IjoxNzM5NTEyODQ1LCJleHAiOjE3NDIxMDQ4NDV9.A9zIFIoxmmsFYdvIjT0-n_HJqbA1POirZ7P8PQHBHG0"
+    }
 
       // Get tokens from response data
-      const token = response.data.token;
-      const refreshToken = response.data.refresh_token;
+      const token = response.token;
+      const refreshToken = response.refreshToken;
+      console.log({token,refreshToken})
 
       if (!token) {
         throw new Error('No token in response');
@@ -134,8 +139,7 @@ export const AuthProvider = ({ children }) => {
       if (refreshToken) {
         await AsyncStorage.setItem('refreshToken', refreshToken);
       }
-
-      // Set default auth header
+      console.log("AftADding token to Api.defaults")      // Set default auth header
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUserToken(token);
     } catch (error) {

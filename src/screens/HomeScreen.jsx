@@ -25,6 +25,7 @@ const cardWidth = (width - (4 * cardMargin)) / 3; // Adjusting width for 3 colum
 const HomeScreen = () => {
   const navigation = useNavigation();
   const [spaces, setSpaces] = useState([]);
+  const [collections, setCollections] = useState([]);
   const { userToken } = useAuth();
   const [totalItems, setTotalItems] = useState(0);
   const [totalWorth, setTotalWorth] = useState(0);
@@ -64,49 +65,95 @@ const HomeScreen = () => {
       console.error('Error fetching spaces:', error.response?.data || error.message);
     }
   };
+  console.log("spaces",spaces)
+  const fetchCollections = async () => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      const response = await axios.get(`${BASE_URL}/collections/user/collections`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.data && Array.isArray(response.data.data)) {
+        const collectionsData = response.data.data.sort((a, b) => {
+          const dateA = new Date(a.created_at || 0);
+          const dateB = new Date(b.created_at || 0);
+          return dateB - dateA;
+        });
+        setCollections(collectionsData);
+      }
+    } catch (error) {
+      console.error('Error fetching collections:', error);
+    }
+  };
 
   useEffect(() => {
     if (userToken) {
       fetchSpaces();
+      fetchCollections();
     }
   }, [userToken]);
 
-  const renderSpaceCard = ({ item }) => {
-    console.log('Rendering space with image:', item.space_image || item.image);
-    return (
-      <TouchableOpacity
-        style={styles.spaceCard}
-        onPress={() => navigation.navigate('Individual Space', { 
-          space: {
-            id: item.id || item.space_id,
-            title: item.space_name || item.title || item.name || 'Untitled Space',
-            description: item.description || '',
-            image: item.space_image || item.image || require('../assets/images/placeholder.png'),
-            items_count: item.items_count || 0,
-            total_worth: item.total_worth || 0
-          }
-        })}
-      >
-        <Image
-          source={
-            item.space_image
-              ? { uri: item.space_image }
-              : item.image
-              ? { uri: item.image }
-              : require('../assets/images/placeholder.png')
-          }
-          style={styles.spaceImage}
-          resizeMode="cover"
-        />
-        <View style={styles.spaceOverlay}>
-          <Text style={styles.spaceName}>
-            {item?.space_name || item?.title || item?.name || 'Untitled'}
-          </Text>
-          <Text style={styles.itemCount}>{item?.items_count || 0} Items</Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const renderSpaceCard = ({ item }) => (
+    <TouchableOpacity
+      style={styles.spaceCard}
+      onPress={() => navigation.navigate('Individual Space', { 
+        space: {
+          id: item.id || item.space_id,
+          title: item.space_name || item.title || item.name || 'Untitled Space',
+          description: item.description || '',
+          image: item.space_image || item.image || require('../assets/images/placeholder.png'),
+          items_count: item.items_count || 0,
+          total_worth: item.total_worth || 0
+        }
+      })}
+    >
+      <Image
+        source={
+          item.space_image
+            ? { uri: item.space_image }
+            : item.image
+            ? { uri: item.image }
+            : require('../assets/images/placeholder.png')
+        }
+        style={styles.spaceImage}
+        resizeMode="cover"
+      />
+      <View style={styles.spaceOverlay}>
+        <Text style={styles.spaceName}>
+          {item?.space_name || item?.title || item?.name || 'Untitled'}
+        </Text>
+        <Text style={styles.itemCount}>{item?.items_count || 0} Items</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderCollectionCard = ({ item }) => (
+    <TouchableOpacity
+      style={styles.spaceCard}
+      onPress={() => navigation.navigate('CollectionDetail', { 
+        collectionId: item.id || item.collection_id 
+      })}
+    >
+      <Image
+        source={
+          item.collection_image
+            ? { uri: item.collection_image }
+            : require('../assets/images/placeholder.png')
+        }
+        style={styles.spaceImage}
+        resizeMode="cover"
+      />
+      <View style={styles.spaceOverlay}>
+        <Text style={styles.spaceName}>
+          {item?.collection_name || 'Untitled Collection'}
+        </Text>
+        <Text style={styles.itemCount}>{item?.items_count || 0} Items</Text>
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -130,6 +177,8 @@ const HomeScreen = () => {
           <Text style={styles.summaryLabel}>Total Worth</Text>
         </View>
       </View>
+      
+      {/* Spaces Section */}
       <View style={styles.spacesContainer}>
         <View style={styles.headerRow}>
           <Text style={styles.sectionTitle}>Spaces</Text>
@@ -139,7 +188,6 @@ const HomeScreen = () => {
             </TouchableOpacity>
           )}
         </View>
-        {console.log('Rendering FlatList with spaces:', spaces.slice(0, 3))}
         <FlatList
           data={spaces.slice(0, 3)}
           renderItem={renderSpaceCard}
@@ -154,6 +202,30 @@ const HomeScreen = () => {
           )}
         />
       </View>
+
+      {/* Collections Section */}
+      <View style={styles.spacesContainer}>
+        <View style={styles.headerRow}>
+          <Text style={styles.sectionTitle}>Collections</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Collections')}>
+            <Text style={styles.seeAllText}>See All</Text>
+          </TouchableOpacity>
+        </View>
+        <FlatList
+          data={collections.slice(0, 3)}
+          renderItem={renderCollectionCard}
+          keyExtractor={(item, index) => item?.id?.toString() || item?.collection_id?.toString() || index.toString()}
+          numColumns={3}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.carouselContent}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No collections found</Text>
+            </View>
+          )}
+        />
+      </View>
+
       <BottomNavBar />
     </SafeAreaView>
   );
