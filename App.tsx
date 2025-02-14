@@ -1,118 +1,183 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
-
 import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { View, ActivityIndicator } from 'react-native';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { AppProvider } from './src/context/AppContext';
+import { StatusBar, useColorScheme } from 'react-native';
+import { enableScreens } from 'react-native-screens';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+// Enable react-native-screens
+enableScreens();
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
+// Import screens
+import OnboardingScreen from './src/screens/OnboardingScreen';
+import LoginScreen from './src/screens/LoginScreen';
+import CreateAccountScreen from './src/screens/CreateAccountScreen';
+import CreateAccountDetailsScreen from './src/screens/CreateAccountDetailsScreen';
+import HomeScreen from './src/screens/HomeScreen';
+import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
+import VerifyScreen from './src/screens/verify';
+import ProductUploadScreen from './src/screens/ProductUploadScreen';
+import CollectionsScreen from './src/screens/CollectionsScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
+import SpaceScreen from './src/screens/SpaceScreen';
+import EditProfileScreen from './src/screens/EditProfileScreen';
+import NewPasswordScreen from './src/screens/NewPasswordScreen';
+import SpaceDetailsScreen from './src/screens/SpaceDetailsScreen';
+import ChangePasswordScreen from './src/screens/ChangePasswordScreen';
+import SpacesScreen from './src/screens/SpacesScreen';
 
-function Section({children, title}: SectionProps): React.JSX.Element {
+const Stack = createNativeStackNavigator();
+
+// Auth stack
+const AuthStack = () => (
+  <>
+    <Stack.Screen 
+      name="Onboarding" 
+      component={OnboardingScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen 
+      name="Login" 
+      component={LoginScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen 
+      name="CreateAccount" 
+      component={CreateAccountScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen 
+      name="CreateAccountDetails" 
+      component={CreateAccountDetailsScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen 
+      name="ForgotPassword" 
+      component={ForgotPasswordScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen 
+      name="Verify" 
+      component={VerifyScreen}
+      options={{ headerShown: false }}
+    />
+  </>
+);
+console.log("App screen componetn")
+
+// App stack
+const AppStack = () => (
+  <>
+    <Stack.Screen 
+      name="Home" 
+      component={HomeScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen 
+      name="Spaces" 
+      component={SpacesScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen 
+      name="Space" 
+      component={SpaceScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen 
+      name="ProductUpload" 
+      component={ProductUploadScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen 
+      name="Collections" 
+      component={CollectionsScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen 
+      name="Profile" 
+      component={ProfileScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen 
+      name="EditProfile" 
+      component={EditProfileScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen 
+      name="NewPassword" 
+      component={NewPasswordScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen 
+      name="SpaceDetails" 
+      component={SpaceDetailsScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen 
+      name="ChangePassword" 
+      component={ChangePasswordScreen}
+      options={{ headerShown: false }}
+    />
+  </>
+);
+
+// Navigation component that uses the auth context
+const Navigation = () => {
+  const { isLoading, userToken } = useAuth();
   const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-}
-
-function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
+  const colors = isDarkMode ? {
+    primary: '#818cf8',
+    background: '#1f2937',
+    surface: '#374151',
+    text: '#f9fafb',
+    textSecondary: '#9ca3af',
+  } : {
+    primary: '#6366f1',
+    background: '#ffffff',
+    surface: '#f3f4f6',
+    text: '#1f2937',
+    textSecondary: '#6b7280',
   };
 
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#6B46C1" />
+      </View>
+    );
+  }
+
   return (
-    <SafeAreaView style={backgroundStyle}>
+    <NavigationContainer>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
+        backgroundColor={colors.background}
       />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+      <Stack.Navigator>
+        {userToken == null ? (
+          // No token found, show auth screens
+          AuthStack()
+        ) : (
+          // Valid token found, show app screens
+          AppStack()
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-});
+// Main App component wrapped with Providers
+const App = () => {
+  return (
+    <AuthProvider>
+      <AppProvider>
+        <Navigation />
+      </AppProvider>
+    </AuthProvider>
+  );
+};
 
 export default App;
