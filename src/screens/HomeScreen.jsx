@@ -40,32 +40,35 @@ const HomeScreen = () => {
           'Content-Type': 'application/json',
         },
       });
-      console.log('Raw API Response:', response.data);
-      if (response.data && Array.isArray(response.data.data)) {
-        // Sort spaces by creation date (most recent first)
-        const spacesData = response.data.data.sort((a, b) => {
-          const dateA = new Date(a.created_at || 0);
-          const dateB = new Date(b.created_at || 0);
-          return dateB - dateA;
-        });
-        console.log('Processed Spaces Data:', spacesData);
-        setSpaces(spacesData);
-        let items = 0;
-        let worth = 0;
-        spacesData.forEach((space) => {
-          items += space?.items_count || 0;
-          worth += space?.total_worth || 0;
-        });
-        setTotalItems(items);
-        setTotalWorth(worth);
-      } else {
-        console.error('Invalid API response format:', response.data);
-      }
+      console.log('Raw Spaces API Response:', JSON.stringify(response.data, null, 2));
+      
+      // Normalize data to ensure consistent structure
+      const spacesData = (response.data?.data || response.data || []).map(space => ({
+        id: space.id || space.space_id,
+        name: space.space_name || space.name || space.title || 'Untitled Space',
+        description: space.description || '',
+        image: space.space_image || space.image || require('../assets/images/placeholder.png'),
+        items_count: space.items_count || 0,
+        total_worth: space.total_worth || 0,
+        created_at: space.created_at
+      })).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+      console.log('Processed Spaces Data:', JSON.stringify(spacesData, null, 2));
+      setSpaces(spacesData);
+
+      // Calculate total items and worth
+      const items = spacesData.reduce((sum, space) => sum + (space.items_count || 0), 0);
+      const worth = spacesData.reduce((sum, space) => sum + (space.total_worth || 0), 0);
+      
+      setTotalItems(items);
+      setTotalWorth(worth);
     } catch (error) {
       console.error('Error fetching spaces:', error.response?.data || error.message);
+      // Optionally set empty array or show error to user
+      setSpaces([]);
     }
   };
-  console.log("spaces",spaces)
+
   const fetchCollections = async () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
@@ -76,16 +79,24 @@ const HomeScreen = () => {
         }
       });
 
-      if (response.data && Array.isArray(response.data.data)) {
-        const collectionsData = response.data.data.sort((a, b) => {
-          const dateA = new Date(a.created_at || 0);
-          const dateB = new Date(b.created_at || 0);
-          return dateB - dateA;
-        });
-        setCollections(collectionsData);
-      }
+      console.log('Raw Collections API Response:', JSON.stringify(response.data, null, 2));
+      
+      // Normalize data to ensure consistent structure
+      const collectionsData = (response.data?.data || response.data || []).map(collection => ({
+        id: collection.id || collection.collection_id,
+        name: collection.collection_name || collection.name || 'Untitled Collection',
+        description: collection.description || '',
+        image: collection.collection_image || collection.image || require('../assets/images/placeholder.png'),
+        items_count: collection.items_count || 0,
+        created_at: collection.created_at
+      })).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+      console.log('Processed Collections Data:', JSON.stringify(collectionsData, null, 2));
+      setCollections(collectionsData);
     } catch (error) {
-      console.error('Error fetching collections:', error);
+      console.error('Error fetching collections:', error.response?.data || error.message);
+      // Optionally set empty array or show error to user
+      setCollections([]);
     }
   };
 
@@ -99,33 +110,19 @@ const HomeScreen = () => {
   const renderSpaceCard = ({ item }) => (
     <TouchableOpacity
       style={styles.spaceCard}
-      onPress={() => navigation.navigate('Individual Space', { 
-        space: {
-          id: item.id || item.space_id,
-          title: item.space_name || item.title || item.name || 'Untitled Space',
-          description: item.description || '',
-          image: item.space_image || item.image || require('../assets/images/placeholder.png'),
-          items_count: item.items_count || 0,
-          total_worth: item.total_worth || 0
-        }
+      onPress={() => navigation.navigate('IndividualSpace', { 
+        spaceId: item.id,
+        spaceName: item.name
       })}
     >
       <Image
-        source={
-          item.space_image
-            ? { uri: item.space_image }
-            : item.image
-            ? { uri: item.image }
-            : require('../assets/images/placeholder.png')
-        }
+        source={typeof item.image === 'number' ? item.image : { uri: item.image }}
         style={styles.spaceImage}
         resizeMode="cover"
       />
       <View style={styles.spaceOverlay}>
-        <Text style={styles.spaceName}>
-          {item?.space_name || item?.title || item?.name || 'Untitled'}
-        </Text>
-        <Text style={styles.itemCount}>{item?.items_count || 0} Items</Text>
+        <Text style={styles.spaceName}>{item.name}</Text>
+        <Text style={styles.itemCount}>{item.items_count} Items</Text>
       </View>
     </TouchableOpacity>
   );
@@ -134,23 +131,23 @@ const HomeScreen = () => {
     <TouchableOpacity
       style={styles.spaceCard}
       onPress={() => navigation.navigate('CollectionDetail', { 
-        collectionId: item.id || item.collection_id 
+        collection: {
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          image: typeof item.image === 'number' ? item.image : { uri: item.image },
+          items_count: item.items_count
+        }
       })}
     >
       <Image
-        source={
-          item.collection_image
-            ? { uri: item.collection_image }
-            : require('../assets/images/placeholder.png')
-        }
+        source={typeof item.image === 'number' ? item.image : { uri: item.image }}
         style={styles.spaceImage}
         resizeMode="cover"
       />
       <View style={styles.spaceOverlay}>
-        <Text style={styles.spaceName}>
-          {item?.collection_name || 'Untitled Collection'}
-        </Text>
-        <Text style={styles.itemCount}>{item?.items_count || 0} Items</Text>
+        <Text style={styles.spaceName}>{item.name}</Text>
+        <Text style={styles.itemCount}>{item.items_count} Items</Text>
       </View>
     </TouchableOpacity>
   );

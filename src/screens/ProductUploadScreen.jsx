@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -8,22 +8,18 @@ import {
   TextInput,
   ScrollView,
   FlatList,
+  Alert,
   Modal,
   PermissionsAndroid,
   Platform,
   Linking,
-  ActivityIndicator,
-  Alert,
 } from 'react-native';
-import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
 import BottomNavBar from '../components/BottomNavBar';
-import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuth } from '../context/AuthContext';
-
+import axios from 'axios';
 const BASE_URL = 'http://13.49.68.11:3000';
-
-const ProductUploadScreen = ({ navigation }) => {
+const ProductUpload = ({navigation}) => {
   const [images, setImages] = useState([]);
   const [productName, setProductName] = useState('');
   const [description, setDescription] = useState('');
@@ -31,19 +27,18 @@ const ProductUploadScreen = ({ navigation }) => {
   const [selectedSpace, setSelectedSpace] = useState(null);
   const [showSpaceInput, setShowSpaceInput] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState('');
-  const [newSpaceDescription, setNewSpaceDescription] = useState('');
   const [newSpaceImage, setNewSpaceImage] = useState(null);
+  const [newSpaceDescription, setNewSpaceDescription] = useState('');
   const [spaces, setSpaces] = useState([]);
+  const [showImageOptions, setShowImageOptions] = useState(false);
+
+  // New state for collections
   const [collections, setCollections] = useState([]);
   const [selectedCollections, setSelectedCollections] = useState([]);
-  const [showCollectionModal, setShowCollectionModal] = useState(false);
+  const [showCollectionInput, setShowCollectionInput] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState('');
   const [newCollectionDescription, setNewCollectionDescription] = useState('');
   const [newCollectionImage, setNewCollectionImage] = useState(null);
-  const [showImageOptions, setShowImageOptions] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [showSpaceModal, setShowSpaceModal] = useState(false);
-  const { userToken } = useAuth();
 
   const checkAndroidPermissions = async () => {
     if (Platform.OS !== 'android') return true;
@@ -55,13 +50,15 @@ const ProductUploadScreen = ({ navigation }) => {
           PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
           {
             title: 'Photo Permission',
-            message: 'This app needs access to your photos to upload product images.',
+            message:
+              'This app needs access to your photos to upload product images.',
             buttonNeutral: 'Ask Me Later',
             buttonNegative: 'Cancel',
             buttonPositive: 'OK',
-          }
+          },
         );
         if (result !== PermissionsAndroid.RESULTS.GRANTED) {
+          showPermissionAlert();
           return false;
         }
       } else {
@@ -70,13 +67,15 @@ const ProductUploadScreen = ({ navigation }) => {
           PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
           {
             title: 'Photo Permission',
-            message: 'This app needs access to your photos to upload product images.',
+            message:
+              'This app needs access to your photos to upload product images.',
             buttonNeutral: 'Ask Me Later',
             buttonNegative: 'Cancel',
             buttonPositive: 'OK',
-          }
+          },
         );
         if (result !== PermissionsAndroid.RESULTS.GRANTED) {
+          showPermissionAlert();
           return false;
         }
       }
@@ -87,126 +86,178 @@ const ProductUploadScreen = ({ navigation }) => {
     }
   };
 
-  const checkCameraPermissions = async () => {
-    if (Platform.OS !== 'android') return true;
+  const showPermissionAlert = () => {
+    Alert.alert(
+      'Permission Required',
+      'This app needs access to your photos to upload product images. Please enable it in your device settings.',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {text: 'Open Settings', onPress: openSettings},
+      ],
+    );
+  };
 
-    try {
-      const cameraPermission = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.CAMERA,
-        {
-          title: 'Camera Permission',
-          message: 'This app needs access to your camera to take product photos.',
-          buttonNeutral: 'Ask Me Later',
-          buttonNegative: 'Cancel',
-          buttonPositive: 'OK',
-        }
-      );
-
-      const storagePermission = await PermissionsAndroid.request(
-        Platform.Version >= 33
-          ? PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
-          : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-        {
-          title: 'Storage Permission',
-          message: 'This app needs access to your storage to save and upload photos.',
-          buttonNeutral: 'Ask Me Later',
-          buttonNegative: 'Cancel',
-          buttonPositive: 'OK',
-        }
-      );
-
-      return (
-        cameraPermission === PermissionsAndroid.RESULTS.GRANTED &&
-        storagePermission === PermissionsAndroid.RESULTS.GRANTED
-      );
-    } catch (err) {
-      console.warn('Permission check error:', err);
-      return false;
+  const openSettings = () => {
+    if (Platform.OS === 'ios') {
+      Linking.openURL('app-settings:');
+    } else {
+      Linking.openSettings();
     }
   };
 
-  const fetchSpaces = async () => {
+  const handleCamera = async () => {
     try {
-      const token = await AsyncStorage.getItem('accessToken');
-      const response = await axios.get(`${BASE_URL}/spaces/user`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
+      // Request camera permission for Android
+      if (Platform.OS === 'android') {
+        const cameraPermission = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          {
+            title: 'Camera Permission',
+            message: 'This app needs access to your camera to take photos.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          }
+        );
+        
+        if (cameraPermission !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert('Permission Denied', 'You need to grant camera permission to take photos');
+          return;
         }
+      }
+
+      const result = await launchCamera({
+        mediaType: 'photo',
+        quality: 0.8,
+        saveToPhotos: true,
+        includeBase64: true,
+        cameraType: 'back',
       });
 
-      if (response.data && Array.isArray(response.data.data)) {
-        const spacesData = response.data.data.map(space => ({
-          id: space.id || space.space_id,
-          title: space.space_name || space.title || space.name,
-          description: space.description,
-          image: space.space_image
-        }));
-        setSpaces(spacesData);
+      if (result.didCancel) {
+        console.log('User cancelled camera');
+      } else if (result.errorCode) {
+        console.error('Camera Error:', result.errorMessage);
+        Alert.alert('Error', 'Failed to take photo: ' + result.errorMessage);
+      } else if (result.assets && result.assets[0]) {
+        const newImage = result.assets[0];
+        setImages([...images, newImage]);
       }
     } catch (error) {
-      console.error('Error fetching spaces:', error.response?.data || error.message);
+      console.error('Camera Error:', error);
+      Alert.alert('Error', 'Failed to take photo. Please try again.');
+    }
+    setShowImageOptions(false);
+  };
+
+  const handleGallery = async () => {
+    try {
+      const hasPermission = await checkAndroidPermissions();
+      if (!hasPermission) return;
+
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        quality: 0.8,
+        selectionLimit: 0,
+        includeBase64: true,
+      });
+
+      if (result.didCancel) {
+        console.log('User cancelled image selection');
+      } else if (result.errorCode) {
+        Alert.alert('Error', 'Failed to select photos: ' + result.errorMessage);
+      } else if (result.assets) {
+        setImages([...images, ...result.assets]);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to select photos. Please try again.');
+      console.log('Gallery Error: ', error);
+    }
+    setShowImageOptions(false);
+  };
+
+  const handleAddSpace = () => {
+    if (newSpaceName.trim() && newSpaceDescription.trim()) {
+      const newSpace = {
+        id: Date.now().toString(),
+        name: newSpaceName.trim(),
+        description: newSpaceDescription.trim(),
+        image: newSpaceImage || require('../assets/images/Space_default.jpg'),
+      };
+      setSpaces([...spaces, newSpace]);
+      setSelectedSpace(newSpace);
+      setNewSpaceName('');
+      setNewSpaceDescription('');
+      setNewSpaceImage(null);
+      setShowSpaceInput(false);
     }
   };
 
-  const fetchCollections = async () => {
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      const response = await axios.get(`${BASE_URL}/collections/user/collections`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+  const handleAddCollection = () => {
+    if (newCollectionName.trim() && newCollectionDescription.trim()) {
+      const newCollection = {
+        id: Date.now().toString(),
+        name: newCollectionName.trim(),
+        description: newCollectionDescription.trim(),
+        image:
+          newCollectionImage || require('../assets/images/Space_default.jpg'),
+      };
+      setCollections([...collections, newCollection]);
+      setSelectedCollections([...selectedCollections, newCollection]);
+      setNewCollectionName('');
+      setNewCollectionDescription('');
+      setNewCollectionImage(null);
+      setShowCollectionInput(false);
+    }
+  };
 
-      if (response.data && Array.isArray(response.data.data)) {
-        const collectionsData = response.data.data.map(collection => ({
-          id: collection.id || collection.collection_id,
-          collection_name: collection.collection_name || collection.name,
-          description: collection.description,
-          collection_image: collection.collection_image
-        }));
-        setCollections(collectionsData);
+  const toggleCollection = (collection) => {
+    setSelectedCollections(prev => {
+      const isSelected = prev.some(c => c.id === collection.id);
+      if (isSelected) {
+        return prev.filter(c => c.id !== collection.id);
       } else {
-        setCollections([]);
+        return [...prev, collection];
       }
-    } catch (error) {
-      console.error('Error fetching collections:', error);
-      setCollections([]);
-    }
+    });
   };
 
   const handleCreateSpace = async () => {
-    if (!newSpaceName.trim()) return;
+    console.log('handleCreateSpace');
+    if (!newSpaceName.trim()) {
+      Alert.alert('Error', 'Please enter a space name');
+      return;
+    }
 
-    setIsLoading(true);
     try {
       const token = await AsyncStorage.getItem('accessToken');
-      const spaceData = {
-        space_name: newSpaceName.trim(),
-        description: newSpaceDescription.trim() || newSpaceName.trim(),
-        space_image: newSpaceImage ? newSpaceImage.uri : null,
-        total_worth: 0,
-        items_count: 0
-      };
-
+      console.log({token});
       const spaceResponse = await axios.post(
         `${BASE_URL}/spaces`,
-        spaceData,
+        {
+          space_name: newSpaceName.trim(),
+          description: newSpaceDescription.trim() || newSpaceName.trim(),
+          space_image: newSpaceImage ? newSpaceImage.uri : null,
+          total_worth: 0,
+          items_count: 0,
+        },
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
+            'Content-Type': 'application/json',
+          },
+        },
       );
 
       if (spaceResponse.data) {
+        console.log({data: spaceResponse.data});
+        const spaceResponsedata = spaceResponse.data;
         const newSpace = {
-          id: spaceResponse.data.id || spaceResponse.data.space_id,
-          title: spaceResponse.data.space_name || spaceResponse.data.name,
-          description: spaceResponse.data.description,
-          image: spaceResponse.data.space_image
+          id: spaceResponsedata.data.id || spaceResponsedata.data.space_id,
+          title:
+            spaceResponsedata.data.space_name || spaceResponsedata.data.name,
+          description: spaceResponsedata.data.description,
+          image: spaceResponsedata.data.space_image,
         };
 
         setSpaces(prevSpaces => [newSpace, ...prevSpaces]);
@@ -215,439 +266,192 @@ const ProductUploadScreen = ({ navigation }) => {
         setNewSpaceName('');
         setNewSpaceDescription('');
         setNewSpaceImage(null);
+      } else {
+        Alert.alert('Error', 'Failed to create space. Please try again.');
       }
     } catch (error) {
-      console.error('Error creating space:', error.response?.data || error.message);
+      console.error('Error creating space:', error);
+      Alert.alert('Error', 'An error occurred while creating the space.');
     } finally {
-      setIsLoading(false);
+      //   setIsLoading(false);
     }
   };
 
-  const handleCamera = async () => {
+  const handleUpload = async () => {
     try {
-      // Check and request permissions
-      const hasPermission = await checkCameraPermissions();
-      if (!hasPermission) {
-        Alert.alert(
-          'Permission Denied',
-          'Camera and storage permissions are required to take and save photos.',
-          [
-            { text: 'Open Settings', onPress: () => Linking.openSettings() },
-            { text: 'Cancel', style: 'cancel' }
-          ]
-        );
+      if (!productName.trim()) {
+        Alert.alert('Error', 'Please enter product name');
         return;
       }
 
-      const result = await launchCamera({
-        mediaType: 'photo',
-        quality: 0.8,
-        saveToPhotos: true,
-        includeBase64: false,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        cameraType: 'back', // Use back camera by default
-        presentationStyle: 'fullScreen',
-      });
-
-      if (result.didCancel) {
-        console.log('User cancelled camera');
+      if (!description.trim()) {
+        Alert.alert('Error', 'Please enter description');
         return;
       }
 
-      if (result.errorCode) {
-        console.log('Camera Error', result.errorMessage);
-        Alert.alert('Camera Error', result.errorMessage || 'Failed to take photo');
+      if (!price.trim() || isNaN(parseFloat(price))) {
+        Alert.alert('Error', 'Please enter a valid price');
         return;
       }
 
-      if (result.assets && result.assets[0]) {
-        const newImage = result.assets[0];
-        console.log('Camera Image:', newImage);
-        setImages([...images, newImage]);
-      }
-    } catch (error) {
-      console.error('Camera Launch Error:', error);
-      Alert.alert(
-        'Camera Error',
-        'Failed to launch camera. Please check app permissions.',
-        [
-          { text: 'Open Settings', onPress: () => Linking.openSettings() },
-          { text: 'Cancel', style: 'cancel' }
-        ]
-      );
-    }
-    setShowImageOptions(false);
-  };
-
-  const handleGallery = async () => {
-    try {
-      const hasPermission = await checkAndroidPermissions();
-      if (!hasPermission) {
-        Alert.alert(
-          'Permission Denied',
-          'Storage permission is required to select photos.',
-          [
-            { text: 'Open Settings', onPress: () => Linking.openSettings() },
-            { text: 'Cancel', style: 'cancel' }
-          ]
-        );
+      if (!selectedSpace) {
+        Alert.alert('Error', 'Please select a space');
         return;
       }
 
-      const result = await launchImageLibrary({
-        mediaType: 'photo',
-        quality: 0.8,
-        selectionLimit: 1, // Only allow one image
-        includeBase64: false,
-        maxWidth: 1024,
-        maxHeight: 1024,
-      });
-
-      if (result.didCancel) {
-        console.log('User cancelled image selection');
+      if (selectedCollections.length === 0) {
+        Alert.alert('Error', 'Please select at least one collection');
         return;
       }
 
-      if (result.errorCode) {
-        console.log('Gallery Error', result.errorMessage);
-        Alert.alert('Gallery Error', result.errorMessage || 'Failed to select photo');
+      if (images.length === 0) {
+        Alert.alert('Error', 'Please add at least one image');
         return;
       }
 
-      if (result.assets && result.assets[0]) {
-        const selectedImage = result.assets[0];
-        console.log('Selected Gallery Image:', selectedImage);
-        setImages([selectedImage]);
-      }
-    } catch (error) {
-      console.error('Gallery Launch Error:', error);
-      Alert.alert(
-        'Gallery Error',
-        'Failed to open gallery. Please check app permissions.',
-        [
-          { text: 'Open Settings', onPress: () => Linking.openSettings() },
-          { text: 'Cancel', style: 'cancel' }
-        ]
-      );
-    }
-    setShowImageOptions(false);
-  };
-
-  const handleProductUpload = async () => {
-    // Validate inputs
-    if (!productName.trim()) {
-      Alert.alert('Error', 'Please enter a product name');
-      return;
-    }
-    if (!description.trim()) {
-      Alert.alert('Error', 'Please enter a product description');
-      return;
-    }
-    if (!price.trim() || isNaN(parseFloat(price))) {
-      Alert.alert('Error', 'Please enter a valid product price');
-      return;
-    }
-    if (!selectedSpace) {
-      Alert.alert('Error', 'Please select a space');
-      return;
-    }
-    if (images.length === 0) {
-      Alert.alert('Error', 'Please upload at least one product image');
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
       const token = await AsyncStorage.getItem('accessToken');
       if (!token) {
         throw new Error('Authentication token not found');
       }
 
-      // Create form data
       const formData = new FormData();
-
-      // Add product details as strings
       formData.append('product_name', productName.trim());
       formData.append('description', description.trim());
-      formData.append('price', price.trim());
+      formData.append('price', price.toString());
       formData.append('space_id', selectedSpace.id.toString());
+      
+      // Append collection IDs
+      selectedCollections.forEach(collection => {
+        formData.append('collection_ids[]', collection.id.toString());
+      });
 
-      // Process and append images
-      for (let i = 0; i < images.length; i++) {
-        const image = images[i];
-        const imageUri = Platform.OS === 'android' ? image.uri : image.uri.replace('file://', '');
-
-        if (!imageUri) {
-          throw new Error('Invalid image data');
-        }
-
-        // Get file extension from uri or default to jpg
-        const uriParts = imageUri.split('.');
-        const fileType = uriParts[uriParts.length - 1] || 'jpg';
-
-        // Create file object for multer
-        formData.append('product_images', {
-          uri: imageUri,
-          type: `image/${fileType}`,
-          name: `image_${i}.${fileType}`
+      // Append all images
+      images.forEach((image, index) => {
+        formData.append('image', {
+          uri: image.uri,
+          type: image.type || 'image/jpeg',
+          name: `product_image_${index}.jpg`
         });
-      }
+      });
 
-      // // Log request details for debugging
-      // console.log('Upload Request Details:', {
-      //   url: `${BASE_URL}/products`,
-      //   formDataKeys: Array.from(formData._parts).map(part => part[0]),
-      //   imageCount: images.length
-      // });
+      console.log('Uploading product with data:', {
+        product_name: productName.trim(),
+        description: description.trim(),
+        price: price,
+        space_id: selectedSpace.id,
+        collection_ids: selectedCollections.map(c => c.id),
+        number_of_images: images.length
+      });
 
-      // Make the upload request
-      // const response = await axios({
-      //   method: 'POST',
-      //   url: `${BASE_URL}/products`,
-      //   data: formData,
-      //   headers: {
-      //     'Accept': 'application/json',
-      //     'Content-Type': 'multipart/form-data',
-      //     'Authorization': `Bearer ${token}`
-      //   },
-      //   transformRequest: (data, headers) => {
-      //     // Don't transform the data
-      //     return data;
-      //   },
-      //   timeout: 30000 // 30 second timeout
-      // });
-      const axios = require('axios');
-      const FormData = require('form-data');
-      const fs = require('fs');
-      let data = new FormData();
-      data.append('product_name', 'bed room');
-      data.append('image', 'imageUri');
-      data.append('description', 'Ergonomic office chair');
-      data.append('price', '10');
-      data.append('space_id', '1');
-
-      let config = {
-        method: 'post',
-        maxBodyLength: Infinity,
-        url: 'http://13.49.68.11:3000/products',
+      const response = await axios.post(`${BASE_URL}/products`, formData, {
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxMywiZW1haWwiOiJrYXJ0aGlrdGVzdEBnbWFpbC5jb20iLCJ1c2VybmFtZSI6ImthcnRoaWt0ZXN0IiwiaWF0IjoxNzM5NTE3MTY1LCJleHAiOjE3Mzk2MDM1NjV9.yWwTJY_IwUdBiCOZ7Azgxp-G0njRiHhM3IAEDA96oQQ',
-          ...data.getHeaders()
-        },
-        data: data
-      };
+        }
+      });
 
-      axios.request(config)
-        .then((response) => {
-          console.log(JSON.stringify(response.data));
-        })
-        .catch((error) => {
-          console.log(error);
-        });
+      console.log('Upload response:', response.data);
 
-      if (response.data) {
+      if (response.data && response.data.type === 'success') {
         Alert.alert(
           'Success',
-          'Product uploaded successfully',
-          [{
-            text: 'OK',
-            onPress: () => {
-              // Reset form
-              setProductName('');
-              setDescription('');
-              setPrice('');
-              setImages([]);
-              setSelectedSpace(null);
-              // Navigate back
-              navigation.goBack();
+          'Product uploaded successfully!',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Reset form
+                setImages([]);
+                setProductName('');
+                setDescription('');
+                setPrice('');
+                setSelectedSpace(null);
+                setSelectedCollections([]);
+                // Navigate back to space
+                navigation.navigate('IndividualSpace', { 
+                  spaceId: selectedSpace.id.toString()
+                });
+              }
             }
-          }]
+          ]
         );
+      } else {
+        throw new Error('Upload failed: Invalid response from server');
       }
     } catch (error) {
-      console.error('Upload Error Details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        config: error.config
-      });
-
-      let errorMessage = 'Failed to upload product. ';
-
-      if (error.response) {
-        // Server responded with error
-        if (error.response.status === 413) {
-          errorMessage += 'Image file size is too large.';
-        } else if (error.response.status === 401) {
-          errorMessage += 'Please log in again.';
-        } else {
-          errorMessage += error.response.data?.message || 'Server error occurred.';
-        }
-      } else if (error.code === 'ECONNABORTED') {
-        errorMessage += 'Request timed out. Please check your internet connection.';
-      } else if (!navigator.onLine) {
-        errorMessage += 'No internet connection.';
-      } else {
-        errorMessage += 'Please check your internet connection and try again.';
-      }
-
-      Alert.alert('Upload Failed', errorMessage, [
-        {
-          text: 'Try Again',
-          onPress: () => setIsLoading(false)
-        }
-      ]);
-    } finally {
-      setIsLoading(false);
+      console.error('Error uploading product:', error.response?.data || error.message);
+      Alert.alert('Error', error.response?.data?.message || error.message || 'Failed to upload product');
     }
   };
-
-  const createCollection = async () => {
-    if (!newCollectionName.trim()) return;
-    setIsLoading(true);
-
+  const fetchSpaces = async () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
-
-      // Create form data
-      const formData = new FormData();
-      formData.append('collection_name', newCollectionName.trim());
-      formData.append('description', newCollectionDescription.trim());
-
-      // Add image if selected
-      if (newCollectionImage) {
-        formData.append('collection_image', {
-          uri: newCollectionImage.uri,
-          type: newCollectionImage.type || 'image/jpeg',
-          name: newCollectionImage.fileName || 'collection_image.jpg'
-        });
-      }
-
-      const response = await axios.post(`${BASE_URL}/collections`, formData, {
+      const response = await axios.get(`${BASE_URL}/spaces/user`, {
         headers: {
           Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
+          'Content-Type': 'application/json',
+        },
       });
 
-      if (response.data) {
-        await fetchCollections(); // Refresh collections
-        setShowCollectionModal(false);
-        setNewCollectionName('');
-        setNewCollectionDescription('');
-        setNewCollectionImage(null);
+      console.log('Spaces API Response:', JSON.stringify(response.data, null, 2));
+
+      if (response.data && Array.isArray(response.data.data)) {
+        const spacesData = response.data.data.map(space => ({
+          id: space.id || space.space_id,
+          name: space.space_name || space.name || space.title || 'Unnamed Space',
+          description: space.description || '',
+          image: space.space_image,
+        }));
+
+        console.log('Processed Spaces:', JSON.stringify(spacesData, null, 2));
+        
+        setSpaces(spacesData);
+      } else {
+        console.log('No spaces found or invalid response structure');
+        setSpaces([]);
       }
     } catch (error) {
-      console.error('Error creating collection:', error);
-      Alert.alert('Error', 'Failed to create collection. Please try again.');
-    } finally {
-      setIsLoading(false);
+      console.error('Error fetching spaces:', error.response ? error.response.data : error);
+      Alert.alert('Error', 'An error occurred while fetching spaces.');
     }
   };
+  const fetchCollections = async () => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      const response = await axios.get(
+        `${BASE_URL}/collections/user/collections`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
 
-  const toggleCollectionSelection = (collection) => {
-    if (selectedCollections.find(c => c.id === collection.id)) {
-      setSelectedCollections(selectedCollections.filter(c => c.id !== collection.id));
-    } else {
-      setSelectedCollections([...selectedCollections, collection]);
-    }
-  };
-
-  const renderSpacesAndCollections = () => {
-    const toggleCollectionSelection = (collection) => {
-      const isSelected = selectedCollections.find(c => c.id === collection.id);
-      if (isSelected) {
-        setSelectedCollections(selectedCollections.filter(c => c.id !== collection.id));
+      if (response.data && Array.isArray(response.data.data)) {
+        const collectionsData = response.data.data.map(collection => ({
+          id: collection.id || collection.collection_id,
+          name: collection.collection_name || collection.name,
+          description: collection.description,
+          image: collection.collection_image,
+        }));
+        setCollections(collectionsData);
       } else {
-        setSelectedCollections([...selectedCollections, collection]);
+        console.log('No collections found.');
+        setCollections([]);
       }
-    };
-
-    return (
-      <View style={styles.spacesAndCollectionsContainer}>
-        {/* Spaces Section */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Spaces</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.itemScrollView}
-          >
-            {spaces.map((space) => (
-              <TouchableOpacity
-                key={space.id}
-                style={[
-                  styles.selectorItem,
-                  selectedSpace?.id === space.id && styles.selectedSelectorItem
-                ]}
-                onPress={() => setSelectedSpace(space)}
-              >
-                <Text style={[
-                  styles.selectorItemText,
-                  selectedSpace?.id === space.id && styles.selectedSelectorItemText
-                ]}>
-                  {space.title}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity
-              style={styles.addSelectorButton}
-              onPress={() => setShowSpaceModal(true)}
-            >
-              <Text style={styles.addSelectorButtonText}>+ Add Space</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-
-        {/* Collections Section */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Collections</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.itemScrollView}
-          >
-            {collections.map((collection) => (
-              <TouchableOpacity
-                key={collection.id}
-                style={[
-                  styles.selectorItem,
-                  selectedCollections.find(c => c.id === collection.id) && styles.selectedSelectorItem
-                ]}
-                onPress={() => toggleCollectionSelection(collection)}
-              >
-                <Text style={[
-                  styles.selectorItemText,
-                  selectedCollections.find(c => c.id === collection.id) && styles.selectedSelectorItemText
-                ]}>
-                  {collection.collection_name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity
-              style={styles.addSelectorButton}
-              onPress={() => setShowCollectionModal(true)}
-            >
-              <Text style={styles.addSelectorButtonText}>+ Add Collection</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      </View>
-    );
+    } catch (error) {
+      console.error('Error fetching collections:', error);
+      Alert.alert('Error', 'An error occurred while fetching collections.');
+    }
   };
 
   useEffect(() => {
-    if (userToken) {
-      fetchSpaces();
-      fetchCollections();
-    }
-  }, [userToken]);
-
+    fetchSpaces();
+    fetchCollections();
+  }, []);
   return (
-    <View style={styles.container}>
+    <View style={{flex: 1}}>
       <ScrollView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -658,7 +462,7 @@ const ProductUploadScreen = ({ navigation }) => {
             />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Upload Product</Text>
-          <View style={{ width: 24 }} />
+          <View style={{width: 24}} />
         </View>
 
         {/* Image Upload Section */}
@@ -669,10 +473,10 @@ const ProductUploadScreen = ({ navigation }) => {
                 data={images}
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                renderItem={({ item, index }) => (
+                renderItem={({item, index}) => (
                   <View style={styles.imageContainer}>
                     <Image
-                      source={{ uri: item.uri }}
+                      source={{uri: item.uri}}
                       style={styles.selectedImage}
                       resizeMode="cover"
                     />
@@ -682,8 +486,7 @@ const ProductUploadScreen = ({ navigation }) => {
                         const newImages = [...images];
                         newImages.splice(index, 1);
                         setImages(newImages);
-                      }}
-                    >
+                      }}>
                       <Text style={styles.removeButtonText}>×</Text>
                     </TouchableOpacity>
                   </View>
@@ -692,8 +495,7 @@ const ProductUploadScreen = ({ navigation }) => {
                 ListFooterComponent={
                   <TouchableOpacity
                     style={styles.addMoreButton}
-                    onPress={() => setShowImageOptions(true)}
-                  >
+                    onPress={() => setShowImageOptions(true)}>
                     <Text style={styles.addMoreText}>+</Text>
                   </TouchableOpacity>
                 }
@@ -708,14 +510,12 @@ const ProductUploadScreen = ({ navigation }) => {
           <View style={styles.buttonContainer}>
             <TouchableOpacity
               style={[styles.uploadOptionButton, styles.cameraButton]}
-              onPress={handleCamera}
-            >
+              onPress={handleCamera}>
               <Text style={styles.uploadOptionText}>Take Photo</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.uploadOptionButton, styles.galleryButton]}
-              onPress={handleGallery}
-            >
+              onPress={handleGallery}>
               <Text style={styles.uploadOptionText}>Choose from Gallery</Text>
             </TouchableOpacity>
           </View>
@@ -740,7 +540,6 @@ const ProductUploadScreen = ({ navigation }) => {
             multiline
             numberOfLines={4}
           />
-
           <Text style={styles.label}>Price</Text>
           <TextInput
             style={styles.input}
@@ -750,14 +549,76 @@ const ProductUploadScreen = ({ navigation }) => {
             keyboardType="numeric"
           />
 
-          {/* Space and Collection Selector */}
-          {renderSpacesAndCollections()}
+          {/* Spaces Section */}
+          <View style={styles.spacesSection}>
+            <Text style={styles.label}>Space</Text>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.spacesList}
+            >
+              {spaces.map(space => (
+                <TouchableOpacity
+                  key={space.id}
+                  style={[
+                    styles.spaceItem,
+                    selectedSpace?.id === space.id && styles.selectedSpaceItem,
+                  ]}
+                  onPress={() => setSelectedSpace(space)}>
+                  <Text
+                    style={[
+                      styles.spaceText,
+                      selectedSpace?.id === space.id &&
+                        styles.selectedSpaceText,
+                    ]}>
+                    {space.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={styles.addSpaceButton}
+                onPress={() => setShowSpaceInput(true)}>
+                <Text style={styles.addSpaceText}>+</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
 
-          <TouchableOpacity
-            style={styles.uploadButton}
-            onPress={handleProductUpload}
-            disabled={isLoading}
-          >
+          {/* Collections Section */}
+          <View style={styles.spacesSection}>
+            <Text style={styles.label}>Collections (Select multiple)</Text>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.spacesList}
+            >
+              {collections.map(collection => (
+                <TouchableOpacity
+                  key={collection.id}
+                  style={[
+                    styles.spaceItem,
+                    selectedCollections.some(c => c.id === collection.id) &&
+                      styles.selectedSpaceItem,
+                  ]}
+                  onPress={() => toggleCollection(collection)}>
+                  <Text
+                    style={[
+                      styles.spaceText,
+                      selectedCollections.some(c => c.id === collection.id) &&
+                        styles.selectedSpaceText,
+                    ]}>
+                    {collection.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={styles.addSpaceButton}
+                onPress={() => setShowCollectionInput(true)}>
+                <Text style={styles.addSpaceText}>+</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+
+          <TouchableOpacity style={styles.uploadButton} onPress={handleUpload}>
             <Text style={styles.uploadButtonText}>Upload Product</Text>
           </TouchableOpacity>
         </View>
@@ -768,46 +629,37 @@ const ProductUploadScreen = ({ navigation }) => {
         visible={showImageOptions}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowImageOptions(false)}
-      >
+        onRequestClose={() => setShowImageOptions(false)}>
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setShowImageOptions(false)}
-        >
+          onPress={() => setShowImageOptions(false)}>
           <View style={styles.modalContent}>
-            <TouchableOpacity
-              style={styles.modalOption}
-              onPress={handleCamera}
-            >
+            <TouchableOpacity style={styles.modalOption} onPress={handleCamera}>
               <Text style={styles.modalOptionText}>Take Photo</Text>
             </TouchableOpacity>
             <View style={styles.modalDivider} />
             <TouchableOpacity
               style={styles.modalOption}
-              onPress={handleGallery}
-            >
+              onPress={handleGallery}>
               <Text style={styles.modalOptionText}>Choose from Gallery</Text>
             </TouchableOpacity>
             <View style={styles.modalDivider} />
             <TouchableOpacity
               style={styles.modalOption}
-              onPress={() => setShowImageOptions(false)}
-            >
-              <Text style={[styles.modalOptionText, { color: '#ff3b30' }]}>Cancel</Text>
+              onPress={() => setShowImageOptions(false)}>
+              <Text style={[styles.modalOptionText, {color: '#ff3b30'}]}>
+                Cancel
+              </Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
 
       {/* Add Space Modal */}
-      <Modal
-        visible={showSpaceInput}
-        transparent
-        animationType="fade"
-      >
+      <Modal visible={showSpaceInput} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { width: '90%' }]}>
+          <View style={[styles.modalContent, {width: '90%'}]}>
             <Text style={styles.modalTitle}>Add New Space</Text>
 
             {/* Space Image */}
@@ -824,17 +676,20 @@ const ProductUploadScreen = ({ navigation }) => {
                     selectionLimit: 1,
                   });
 
-                  if (!result.didCancel && !result.errorCode && result.assets?.[0]) {
+                  if (
+                    !result.didCancel &&
+                    !result.errorCode &&
+                    result.assets?.[0]
+                  ) {
                     setNewSpaceImage(result.assets[0]);
                   }
                 } catch (error) {
-                  console.log('Error', 'Failed to select photo');
+                  Alert.alert('Error', 'Failed to select photo');
                 }
-              }}
-            >
+              }}>
               {newSpaceImage ? (
                 <Image
-                  source={{ uri: newSpaceImage.uri }}
+                  source={{uri: newSpaceImage.uri}}
                   style={styles.spaceImage}
                 />
               ) : (
@@ -858,11 +713,12 @@ const ProductUploadScreen = ({ navigation }) => {
               autoFocus
             />
             <TextInput
-              style={styles.modalInput}
+              style={[styles.modalInput, styles.collectionTextArea]}
               value={newSpaceDescription}
               onChangeText={setNewSpaceDescription}
-              placeholder="Enter space description (max 20 characters)"
-              maxLength={20}
+              placeholder="Enter space description"
+              multiline
+              numberOfLines={4}
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -872,14 +728,12 @@ const ProductUploadScreen = ({ navigation }) => {
                   setNewSpaceName('');
                   setNewSpaceDescription('');
                   setNewSpaceImage(null);
-                }}
-              >
+                }}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalButton, styles.addButton]}
-                onPress={handleCreateSpace}
-              >
+                onPress={handleCreateSpace}>
                 <Text style={styles.addButtonText}>Add</Text>
               </TouchableOpacity>
             </View>
@@ -888,19 +742,14 @@ const ProductUploadScreen = ({ navigation }) => {
       </Modal>
 
       {/* Add Collection Modal */}
-      <Modal
-        visible={showCollectionModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowCollectionModal(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Create New Collection</Text>
+      <Modal visible={showCollectionInput} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, {width: '90%'}]}>
+            <Text style={styles.modalTitle}>Add New Collection</Text>
 
             {/* Collection Image */}
             <TouchableOpacity
-              style={styles.imageUploadContainer}
+              style={styles.spaceImageContainer}
               onPress={async () => {
                 try {
                   const hasPermission = await checkAndroidPermissions();
@@ -912,37 +761,47 @@ const ProductUploadScreen = ({ navigation }) => {
                     selectionLimit: 1,
                   });
 
-                  if (!result.didCancel && !result.errorCode && result.assets?.[0]) {
+                  if (
+                    !result.didCancel &&
+                    !result.errorCode &&
+                    result.assets?.[0]
+                  ) {
                     setNewCollectionImage(result.assets[0]);
                   }
                 } catch (error) {
-                  console.log('Error selecting image:', error);
+                  Alert.alert('Error', 'Failed to select photo');
                 }
-              }}
-            >
+              }}>
               {newCollectionImage ? (
                 <Image
-                  source={{ uri: newCollectionImage.uri }}
-                  style={styles.uploadedImage}
+                  source={{uri: newCollectionImage.uri}}
+                  style={styles.spaceImage}
                 />
               ) : (
-                <View style={styles.imagePlaceholder}>
-                  <Text style={styles.uploadText}>Upload Image</Text>
+                <View style={styles.spaceImagePlaceholder}>
+                  <Image
+                    source={require('../assets/images/Space_default.jpg')}
+                    style={styles.spaceImage}
+                  />
+                  <View style={styles.addSpaceImageButton}>
+                    <Text style={styles.addSpaceImageText}>+</Text>
+                  </View>
                 </View>
               )}
             </TouchableOpacity>
 
             <TextInput
-              style={styles.input}
-              placeholder="Collection Name"
+              style={styles.modalInput}
               value={newCollectionName}
               onChangeText={setNewCollectionName}
+              placeholder="Enter collection name"
+              autoFocus
             />
             <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Description"
+              style={[styles.modalInput, styles.collectionTextArea]}
               value={newCollectionDescription}
               onChangeText={setNewCollectionDescription}
+              placeholder="Enter collection description"
               multiline
               numberOfLines={4}
             />
@@ -950,37 +809,24 @@ const ProductUploadScreen = ({ navigation }) => {
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
-                  setShowCollectionModal(false);
+                  setShowCollectionInput(false);
                   setNewCollectionName('');
                   setNewCollectionDescription('');
                   setNewCollectionImage(null);
-                }}
-              >
+                }}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.createModalButton]}
-                onPress={createCollection}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={styles.createModalButtonText}>Create</Text>
-                )}
+                style={[styles.modalButton, styles.addButton]}
+                onPress={handleAddCollection}>
+                <Text style={styles.addButtonText}>Add</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* Loading Overlay */}
-      {isLoading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#6B46C1" />
-          <Text style={styles.loadingText}>Uploading product...</Text>
-        </View>
-      )}
+      <BottomNavBar />
     </View>
   );
 };
@@ -1029,6 +875,14 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   selectedImage: {
     width: '100%',
@@ -1124,121 +978,89 @@ const styles = StyleSheet.create({
     height: 100,
     textAlignVertical: 'top',
   },
+  collectionTextArea: {
+    height: 120,
+  },
   label: {
     fontSize: 16,
     color: '#666',
     marginBottom: 5,
   },
-  section: {
+  spacesSection: {
     marginBottom: 20,
-    paddingHorizontal: 16,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 12,
-  },
-  spacesAndCollectionsContainer: {
-    marginVertical: 16,
-  },
-  scrollViewContent: {
-    paddingHorizontal: 16,
-  },
-  sectionContainer: {
-    marginBottom: 16,
-  },
-  selectorItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  selectedSelectorItem: {
-    backgroundColor: '#6B46C1',
-    borderColor: '#6B46C1',
-  },
-  selectorItemText: {
-    fontSize: 14,
-    color: '#4A5568',
-    fontWeight: '500',
-  },
-  selectedSelectorItemText: {
-    color: '#FFFFFF',
-  },
-  addSelectorButton: {
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    justifyContent: 'center',
+  spacesList: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
+    marginTop: 10,
   },
-  addSelectorButtonText: {
+  spaceItem: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  selectedSpaceItem: {
+    backgroundColor: '#8b4ae2',
+    borderColor: '#8b4ae2',
+  },
+  spaceText: {
+    color: '#666',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  selectedSpaceText: {
+    color: '#fff',
+  },
+  addSpaceButton: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#8b4ae2',
+    borderStyle: 'dashed',
+  },
+  addSpaceText: {
+    color: '#8b4ae2',
     fontSize: 16,
-    color: '#6B46C1',
-    fontWeight: '600',
+    fontWeight: '500',
   },
   modalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContainer: {
-    width: '90%',
-    borderRadius: 16,
     padding: 20,
-    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: 16,
-  },
-  imagePickerContainer: {
-    width: '100%',
-    height: 200,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    overflow: 'hidden',
-  },
-  pickedImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  placeholderImagePicker: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  placeholderImagePickerText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    marginBottom: 15,
+    color: '#000',
   },
   modalInput: {
-    width: '100%',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    color: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 16,
+    padding: 12,
+    marginBottom: 15,
+    fontSize: 16,
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    width: '100%',
+    gap: 10,
   },
   modalButton: {
     paddingHorizontal: 20,
@@ -1320,48 +1142,6 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '600',
   },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#6B46C1',
-    fontSize: 16,
-  },
-  imageUploadContainer: {
-    width: '100%',
-    height: 150,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-    marginBottom: 16,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  uploadedImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  imagePlaceholder: {
-    flex: 1,
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  uploadText: {
-    color: '#6B7280',
-    fontSize: 16,
-    fontWeight: '500',
-  },
 });
 
-export default ProductUploadScreen;
+export default ProductUpload;

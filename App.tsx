@@ -28,6 +28,7 @@ import NewPasswordScreen from './src/screens/NewPasswordScreen';
 import SpaceDetailsScreen from './src/screens/SpaceDetailsScreen';
 import ChangePasswordScreen from './src/screens/ChangePasswordScreen';
 import SpacesScreen from './src/screens/SpacesScreen';
+import IndividualSpaceScreen from './src/screens/IndividualSpaceScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -84,6 +85,11 @@ const AppStack = () => (
     <Stack.Screen 
       name="Space" 
       component={SpaceScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen 
+      name="IndividualSpace" 
+      component={IndividualSpaceScreen}
       options={{ headerShown: false }}
     />
     <Stack.Screen 

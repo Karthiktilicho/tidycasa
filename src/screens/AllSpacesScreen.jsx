@@ -40,7 +40,10 @@ const AllSpacesScreen = () => {
   const renderSpaceCard = ({ item: space }) => (
     <TouchableOpacity
       style={styles.spaceCard}
-      onPress={() => navigation.navigate('SpaceDetails', { spaceId: space.id })}
+      onPress={() => navigation.navigate('IndividualSpace', { 
+        spaceId: space.id,
+        spaceName: space.name 
+      })}
     >
       <Image source={space.image} style={styles.spaceImage} />
       <View style={styles.spaceInfo}>
