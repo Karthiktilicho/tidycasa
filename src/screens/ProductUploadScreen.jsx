@@ -117,11 +117,14 @@ const ProductUpload = ({navigation}) => {
             buttonNeutral: 'Ask Me Later',
             buttonNegative: 'Cancel',
             buttonPositive: 'OK',
-          }
+          },
         );
-        
+
         if (cameraPermission !== PermissionsAndroid.RESULTS.GRANTED) {
-          Alert.alert('Permission Denied', 'You need to grant camera permission to take photos');
+          Alert.alert(
+            'Permission Denied',
+            'You need to grant camera permission to take photos',
+          );
           return;
         }
       }
@@ -211,7 +214,7 @@ const ProductUpload = ({navigation}) => {
     }
   };
 
-  const toggleCollection = (collection) => {
+  const toggleCollection = collection => {
     setSelectedCollections(prev => {
       const isSelected = prev.some(c => c.id === collection.id);
       if (isSelected) {
@@ -319,7 +322,7 @@ const ProductUpload = ({navigation}) => {
       formData.append('description', description.trim());
       formData.append('price', price.toString());
       formData.append('space_id', selectedSpace.id.toString());
-      
+
       // Append collection IDs
       selectedCollections.forEach(collection => {
         formData.append('collection_ids[]', collection.id.toString());
@@ -330,7 +333,7 @@ const ProductUpload = ({navigation}) => {
         formData.append('image', {
           uri: image.uri,
           type: image.type || 'image/jpeg',
-          name: `product_image_${index}.jpg`
+          name: `product_image_${index}.jpg`,
         });
       });
 
@@ -340,47 +343,51 @@ const ProductUpload = ({navigation}) => {
         price: price,
         space_id: selectedSpace.id,
         collection_ids: selectedCollections.map(c => c.id),
-        number_of_images: images.length
+        number_of_images: images.length,
       });
 
       const response = await axios.post(`${BASE_URL}/products`, formData, {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
-        }
+        },
       });
 
       console.log('Upload response:', response.data);
 
       if (response.data && response.data.type === 'success') {
-        Alert.alert(
-          'Success',
-          'Product uploaded successfully!',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Reset form
-                setImages([]);
-                setProductName('');
-                setDescription('');
-                setPrice('');
-                setSelectedSpace(null);
-                setSelectedCollections([]);
-                // Navigate back to space
-                navigation.navigate('IndividualSpace', { 
-                  spaceId: selectedSpace.id.toString()
-                });
-              }
-            }
-          ]
-        );
+        Alert.alert('Success', 'Product uploaded successfully!', [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Reset form
+              setImages([]);
+              setProductName('');
+              setDescription('');
+              setPrice('');
+              setSelectedSpace(null);
+              setSelectedCollections([]);
+              // Navigate back to space
+              navigation.navigate('IndividualSpace', {
+                spaceId: selectedSpace.id.toString(),
+              });
+            },
+          },
+        ]);
       } else {
         throw new Error('Upload failed: Invalid response from server');
       }
     } catch (error) {
-      console.error('Error uploading product:', error.response?.data || error.message);
-      Alert.alert('Error', error.response?.data?.message || error.message || 'Failed to upload product');
+      console.error(
+        'Error uploading product:',
+        error.response?.data || error.message,
+      );
+      Alert.alert(
+        'Error',
+        error.response?.data?.message ||
+          error.message ||
+          'Failed to upload product',
+      );
     }
   };
   const fetchSpaces = async () => {
@@ -393,25 +400,32 @@ const ProductUpload = ({navigation}) => {
         },
       });
 
-      console.log('Spaces API Response:', JSON.stringify(response.data, null, 2));
+      console.log(
+        'Spaces API Response:',
+        JSON.stringify(response.data, null, 2),
+      );
 
       if (response.data && Array.isArray(response.data.data)) {
         const spacesData = response.data.data.map(space => ({
           id: space.id || space.space_id,
-          name: space.space_name || space.name || space.title || 'Unnamed Space',
+          name:
+            space.space_name || space.name || space.title || 'Unnamed Space',
           description: space.description || '',
           image: space.space_image,
         }));
 
         console.log('Processed Spaces:', JSON.stringify(spacesData, null, 2));
-        
+
         setSpaces(spacesData);
       } else {
         console.log('No spaces found or invalid response structure');
         setSpaces([]);
       }
     } catch (error) {
-      console.error('Error fetching spaces:', error.response ? error.response.data : error);
+      console.error(
+        'Error fetching spaces:',
+        error.response ? error.response.data : error,
+      );
       Alert.alert('Error', 'An error occurred while fetching spaces.');
     }
   };
@@ -552,11 +566,10 @@ const ProductUpload = ({navigation}) => {
           {/* Spaces Section */}
           <View style={styles.spacesSection}>
             <Text style={styles.label}>Space</Text>
-            <ScrollView 
-              horizontal 
+            <ScrollView
+              horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.spacesList}
-            >
+              contentContainerStyle={styles.spacesList}>
               {spaces.map(space => (
                 <TouchableOpacity
                   key={space.id}
@@ -586,11 +599,10 @@ const ProductUpload = ({navigation}) => {
           {/* Collections Section */}
           <View style={styles.spacesSection}>
             <Text style={styles.label}>Collections (Select multiple)</Text>
-            <ScrollView 
-              horizontal 
+            <ScrollView
+              horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.spacesList}
-            >
+              contentContainerStyle={styles.spacesList}>
               {collections.map(collection => (
                 <TouchableOpacity
                   key={collection.id}

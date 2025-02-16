@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import React, {useState, useEffect} from 'react';
+import {NavigationContainer} from '@react-navigation/native';
+import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, ActivityIndicator } from 'react-native';
+import {View, ActivityIndicator} from 'react-native';
 
 import OnboardingScreen from '../screens/OnboardingScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -17,6 +17,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import SpaceScreen from '../screens/SpaceScreen';
 import IndividualSpaceScreen from '../screens/IndividualSpaceScreen';
 import ChangePasswordScreen from '../screens/ChangePasswordScreen';
+import ProductDetailsScreen from '../screens/SingleProductScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -31,7 +32,7 @@ const AppNavigator = () => {
   const checkAuth = async () => {
     try {
       const accessToken = await AsyncStorage.getItem('accessToken');
-      console.log('Auth Check:', { hasToken: !!accessToken });
+      console.log('Auth Check:', {hasToken: !!accessToken});
       setIsAuthenticated(!!accessToken);
     } catch (error) {
       console.error('Auth check failed:', error);
@@ -43,7 +44,7 @@ const AppNavigator = () => {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
         <ActivityIndicator size="large" color="#6B46C1" />
       </View>
     );
@@ -51,87 +52,92 @@ const AppNavigator = () => {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator 
-        initialRouteName={isAuthenticated ? "Space" : "Onboarding"}
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: '#f4511e',
-          },
-          headerTintColor: '#fff',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
-        }}
+      <Stack.Navigator
+        initialRouteName={isAuthenticated ? 'Space' : 'Onboarding'}
+        // screenOptions={{
+        //   headerStyle: {
+        //     backgroundColor: '#f4511e',
+        //   },
+        //   headerTintColor: '#fff',
+        //   headerTitleStyle: {
+        //     fontWeight: 'bold',
+        //   },
+        // }}
       >
         {!isAuthenticated ? (
           <>
-            <Stack.Screen 
-              name="Onboarding" 
+            <Stack.Screen
+              name="Onboarding"
               component={OnboardingScreen}
-              options={{ headerShown: false }}
+              options={{headerShown: false}}
             />
-            <Stack.Screen 
-              name="Login" 
+            <Stack.Screen
+              name="Login"
               component={LoginScreen}
-              options={{ headerShown: false }}
+              options={{headerShown: false}}
             />
-            <Stack.Screen 
-              name="CreateAccount" 
+            <Stack.Screen
+              name="CreateAccount"
               component={CreateAccountScreen}
-              options={{ headerShown: false }}
+              options={{headerShown: false}}
             />
-            <Stack.Screen 
-              name="CreateAccountDetails" 
+            <Stack.Screen
+              name="CreateAccountDetails"
               component={CreateAccountDetailsScreen}
-              options={{ headerShown: false }}
+              options={{headerShown: false}}
             />
-            <Stack.Screen 
-              name="Forgot" 
+            <Stack.Screen
+              name="Forgot"
               component={ForgotScreen}
-              options={{ headerShown: false }}
+              options={{headerShown: false}}
             />
-            <Stack.Screen 
-              name="Verify" 
+            <Stack.Screen
+              name="Verify"
               component={VerifyScreen}
-              options={{ headerShown: false }}
+              options={{headerShown: false}}
             />
           </>
         ) : (
           <>
-            <Stack.Screen 
-              name="Space" 
+            <Stack.Screen
+              name="Space"
               component={SpaceScreen}
-              options={{ headerShown: false }}
+              options={{headerShown: false}}
             />
-            <Stack.Screen 
-              name="Home" 
+            <Stack.Screen
+              name="Home"
               component={HomeScreen}
-              options={{ headerShown: false }}
+              options={{headerShown: false}}
             />
-            <Stack.Screen 
-              name="ProductUpload" 
+            <Stack.Screen
+              name="ProductUpload"
               component={ProductUploadScreen}
-              options={{ headerShown: false }}
+              options={{headerShown: false}}
             />
-            <Stack.Screen 
-              name="Collections" 
+            <Stack.Screen
+              name="Collections"
               component={CollectionsScreen}
-              options={{ headerShown: false }}
+              options={{headerShown: false}}
             />
-            <Stack.Screen 
-              name="Profile" 
+            <Stack.Screen
+              name="Profile"
               component={ProfileScreen}
-              options={{ headerShown: false }}
+              options={{headerShown: false}}
             />
-            <Stack.Screen 
-              name="Individual Space" 
+            <Stack.Screen
+              name="Individual Space"
               component={IndividualSpaceScreen}
-              options={{ headerShown: false }}
+              options={{headerShown: true}}
             />
-            <Stack.Screen 
-              name="ChangePassword" 
+            <Stack.Screen
+              name="ChangePassword"
               component={ChangePasswordScreen}
-              options={{ headerShown: false }}
+              options={{headerShown: false}}
+            />
+            <Stack.Screen
+              name="Individual Product Screen"
+              component={ProductDetailsScreen}
+              options={{headerShown: false}}
             />
           </>
         )}

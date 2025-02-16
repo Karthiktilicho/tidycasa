@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -11,24 +11,26 @@ import {
   FlatList,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
-import { useAuth } from '../context/AuthContext';
+import {useNavigation} from '@react-navigation/native';
+import {useAuth} from '../context/AuthContext';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBar from '../components/BottomNavBar';
 
 const BASE_URL = 'http://13.49.68.11:3000';
-const { width } = Dimensions.get('window');
+const {width} = Dimensions.get('window');
 const cardMargin = 10;
-const cardWidth = (width - (4 * cardMargin)) / 3; // Adjusting width for 3 columns
+const cardWidth = (width - 4 * cardMargin) / 3; // Adjusting width for 3 columns
 
 const HomeScreen = () => {
   const navigation = useNavigation();
   const [spaces, setSpaces] = useState([]);
   const [collections, setCollections] = useState([]);
-  const { userToken } = useAuth();
+  const {userToken} = useAuth();
   const [totalItems, setTotalItems] = useState(0);
   const [totalWorth, setTotalWorth] = useState(0);
+
+  console.log(spaces, 'spaces');
 
   const fetchSpaces = async () => {
     try {
@@ -40,30 +42,53 @@ const HomeScreen = () => {
           'Content-Type': 'application/json',
         },
       });
-      console.log('Raw Spaces API Response:', JSON.stringify(response.data, null, 2));
-      
-      // Normalize data to ensure consistent structure
-      const spacesData = (response.data?.data || response.data || []).map(space => ({
-        id: space.id || space.space_id,
-        name: space.space_name || space.name || space.title || 'Untitled Space',
-        description: space.description || '',
-        image: space.space_image || space.image || require('../assets/images/placeholder.png'),
-        items_count: space.items_count || 0,
-        total_worth: space.total_worth || 0,
-        created_at: space.created_at
-      })).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      console.log(
+        'Raw Spaces API Response:',
+        JSON.stringify(response.data, null, 2),
+      );
 
-      console.log('Processed Spaces Data:', JSON.stringify(spacesData, null, 2));
+      // Normalize data to ensure consistent structure
+      const spacesData = (response.data?.data || response.data || [])
+        .map(space => ({
+          id: space.id || space.space_id,
+          name:
+            space.space_name || space.name || space.title || 'Untitled Space',
+          description: space.description || '',
+          image:
+            space.space_image ||
+            space.image ||
+            require('../assets/images/placeholder.png'),
+          items_count: space.items_count || 0,
+          total_worth: space.total_worth || 0,
+          created_at: space.created_at,
+        }))
+        .sort(
+          (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
+        );
+
+      console.log(
+        'Processed Spaces Data:',
+        JSON.stringify(spacesData, null, 2),
+      );
       setSpaces(spacesData);
 
       // Calculate total items and worth
-      const items = spacesData.reduce((sum, space) => sum + (space.items_count || 0), 0);
-      const worth = spacesData.reduce((sum, space) => sum + (space.total_worth || 0), 0);
-      
+      const items = spacesData.reduce(
+        (sum, space) => sum + (space.items_count || 0),
+        0,
+      );
+      const worth = spacesData.reduce(
+        (sum, space) => sum + (space.total_worth || 0),
+        0,
+      );
+
       setTotalItems(items);
       setTotalWorth(worth);
     } catch (error) {
-      console.error('Error fetching spaces:', error.response?.data || error.message);
+      console.error(
+        'Error fetching spaces:',
+        error.response?.data || error.message,
+      );
       // Optionally set empty array or show error to user
       setSpaces([]);
     }
@@ -72,29 +97,51 @@ const HomeScreen = () => {
   const fetchCollections = async () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
-      const response = await axios.get(`${BASE_URL}/collections/user/collections`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await axios.get(
+        `${BASE_URL}/collections/user/collections`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
 
-      console.log('Raw Collections API Response:', JSON.stringify(response.data, null, 2));
-      
+      console.log(
+        'Raw Collections API Response:',
+        JSON.stringify(response.data, null, 2),
+      );
+
       // Normalize data to ensure consistent structure
-      const collectionsData = (response.data?.data || response.data || []).map(collection => ({
-        id: collection.id || collection.collection_id,
-        name: collection.collection_name || collection.name || 'Untitled Collection',
-        description: collection.description || '',
-        image: collection.collection_image || collection.image || require('../assets/images/placeholder.png'),
-        items_count: collection.items_count || 0,
-        created_at: collection.created_at
-      })).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      const collectionsData = (response.data?.data || response.data || [])
+        .map(collection => ({
+          id: collection.id || collection.collection_id,
+          name:
+            collection.collection_name ||
+            collection.name ||
+            'Untitled Collection',
+          description: collection.description || '',
+          image:
+            collection.collection_image ||
+            collection.image ||
+            require('../assets/images/placeholder.png'),
+          items_count: collection.items_count || 0,
+          created_at: collection.created_at,
+        }))
+        .sort(
+          (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
+        );
 
-      console.log('Processed Collections Data:', JSON.stringify(collectionsData, null, 2));
+      console.log(
+        'Processed Collections Data:',
+        JSON.stringify(collectionsData, null, 2),
+      );
       setCollections(collectionsData);
     } catch (error) {
-      console.error('Error fetching collections:', error.response?.data || error.message);
+      console.error(
+        'Error fetching collections:',
+        error.response?.data || error.message,
+      );
       // Optionally set empty array or show error to user
       setCollections([]);
     }
@@ -107,16 +154,17 @@ const HomeScreen = () => {
     }
   }, [userToken]);
 
-  const renderSpaceCard = ({ item }) => (
+  const renderSpaceCard = ({item}) => (
     <TouchableOpacity
       style={styles.spaceCard}
-      onPress={() => navigation.navigate('IndividualSpace', { 
-        spaceId: item.id,
-        spaceName: item.name
-      })}
-    >
+      onPress={() =>
+        navigation.navigate('IndividualSpace', {
+          spaceId: item.id,
+          spaceName: item.name,
+        })
+      }>
       <Image
-        source={typeof item.image === 'number' ? item.image : { uri: item.image }}
+        source={typeof item.image === 'number' ? item.image : {uri: item.image}}
         style={styles.spaceImage}
         resizeMode="cover"
       />
@@ -127,21 +175,23 @@ const HomeScreen = () => {
     </TouchableOpacity>
   );
 
-  const renderCollectionCard = ({ item }) => (
+  const renderCollectionCard = ({item}) => (
     <TouchableOpacity
       style={styles.spaceCard}
-      onPress={() => navigation.navigate('CollectionDetail', { 
-        collection: {
-          id: item.id,
-          name: item.name,
-          description: item.description,
-          image: typeof item.image === 'number' ? item.image : { uri: item.image },
-          items_count: item.items_count
-        }
-      })}
-    >
+      onPress={() =>
+        navigation.navigate('CollectionDetail', {
+          collection: {
+            id: item.id,
+            name: item.name,
+            description: item.description,
+            image:
+              typeof item.image === 'number' ? item.image : {uri: item.image},
+            items_count: item.items_count,
+          },
+        })
+      }>
       <Image
-        source={typeof item.image === 'number' ? item.image : { uri: item.image }}
+        source={typeof item.image === 'number' ? item.image : {uri: item.image}}
         style={styles.spaceImage}
         resizeMode="cover"
       />
@@ -157,24 +207,27 @@ const HomeScreen = () => {
       <StatusBar backgroundColor="#6B46C1" barStyle="light-content" />
       <LinearGradient colors={['#6B46C1', '#9F7AEA']} style={styles.header}>
         <View style={styles.headerTop}>
-          <Image source={require('../assets/images/LogoHorizontal.png')} style={styles.logo} />
+          <Image
+            source={require('../assets/images/LogoHorizontal.png')}
+            style={styles.logo}
+          />
         </View>
       </LinearGradient>
       <View style={styles.summaryContainer}>
-        <View style={[styles.summaryCard, { backgroundColor: '#FFE8D6' }]}>
+        <View style={[styles.summaryCard, {backgroundColor: '#FFE8D6'}]}>
           <Text style={styles.summaryNumber}>{totalItems}</Text>
           <Text style={styles.summaryLabel}>Total Items</Text>
         </View>
-        <View style={[styles.summaryCard, { backgroundColor: '#E8F4F8' }]}>
+        <View style={[styles.summaryCard, {backgroundColor: '#E8F4F8'}]}>
           <Text style={styles.summaryNumber}>{spaces.length}</Text>
           <Text style={styles.summaryLabel}>Spaces</Text>
         </View>
-        <View style={[styles.summaryCard, { backgroundColor: '#F0E6FF' }]}>
+        <View style={[styles.summaryCard, {backgroundColor: '#F0E6FF'}]}>
           <Text style={styles.summaryNumber}>${totalWorth}</Text>
           <Text style={styles.summaryLabel}>Total Worth</Text>
         </View>
       </View>
-      
+
       {/* Spaces Section */}
       <View style={styles.spacesContainer}>
         <View style={styles.headerRow}>
@@ -188,7 +241,11 @@ const HomeScreen = () => {
         <FlatList
           data={spaces.slice(0, 3)}
           renderItem={renderSpaceCard}
-          keyExtractor={(item, index) => item?.id?.toString() || item?.space_id?.toString() || index.toString()}
+          keyExtractor={(item, index) =>
+            item?.id?.toString() ||
+            item?.space_id?.toString() ||
+            index.toString()
+          }
           numColumns={3}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.carouselContent}
@@ -211,7 +268,11 @@ const HomeScreen = () => {
         <FlatList
           data={collections.slice(0, 3)}
           renderItem={renderCollectionCard}
-          keyExtractor={(item, index) => item?.id?.toString() || item?.collection_id?.toString() || index.toString()}
+          keyExtractor={(item, index) =>
+            item?.id?.toString() ||
+            item?.collection_id?.toString() ||
+            index.toString()
+          }
           numColumns={3}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.carouselContent}
@@ -295,7 +356,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '100%',
     padding: 2,
-    paddingLeft:10,
+    paddingLeft: 10,
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   spaceName: {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -10,14 +10,14 @@ import {
   StatusBar,
   Dimensions,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { useAuth } from '../context/AuthContext';
+import {useNavigation} from '@react-navigation/native';
+import {useAuth} from '../context/AuthContext';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LinearGradient from 'react-native-linear-gradient';
 
 const BASE_URL = 'http://13.49.68.11:3000';
-const { width } = Dimensions.get('window');
+const {width} = Dimensions.get('window');
 const numColumns = 2;
 const cardMargin = 10;
 const cardWidth = (width - (numColumns + 1) * cardMargin) / numColumns;
@@ -25,7 +25,7 @@ const cardWidth = (width - (numColumns + 1) * cardMargin) / numColumns;
 const SpacesScreen = () => {
   const navigation = useNavigation();
   const [spaces, setSpaces] = useState([]);
-  const { userToken } = useAuth();
+  const {userToken} = useAuth();
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchSpaces = async () => {
@@ -47,7 +47,10 @@ const SpacesScreen = () => {
         setSpaces(spacesData);
       }
     } catch (error) {
-      console.error('Error fetching spaces:', error.response?.data || error.message);
+      console.error(
+        'Error fetching spaces:',
+        error.response?.data || error.message,
+      );
     } finally {
       setIsLoading(false);
     }
@@ -59,18 +62,19 @@ const SpacesScreen = () => {
     }
   }, [userToken]);
 
-  const renderSpaceCard = ({ item }) => {
+  const renderSpaceCard = ({item}) => {
     return (
       <TouchableOpacity
         style={styles.spaceCard}
-        onPress={() => navigation.navigate('SpaceDetails', { spaceId: item.id })}
-      >
+        onPress={() =>
+          navigation.navigate('IndividualSpace', {spaceId: item.id})
+        }>
         <Image
           source={
             item.space_image
-              ? { uri: item.space_image }
+              ? {uri: item.space_image}
               : item.image
-              ? { uri: item.image }
+              ? {uri: item.image}
               : require('../assets/images/placeholder.png')
           }
           style={styles.spaceImage}
@@ -95,14 +99,14 @@ const SpacesScreen = () => {
             <Text style={styles.backButton}>←</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>All Spaces</Text>
-          <View style={{ width: 30 }} /> {/* Empty view for spacing */}
+          <View style={{width: 30}} /> {/* Empty view for spacing */}
         </View>
       </LinearGradient>
 
       <FlatList
         data={spaces}
         renderItem={renderSpaceCard}
-        keyExtractor={(item) => item?.id?.toString()}
+        keyExtractor={item => item?.id?.toString()}
         numColumns={2}
         contentContainerStyle={styles.gridContainer}
         showsVerticalScrollIndicator={false}

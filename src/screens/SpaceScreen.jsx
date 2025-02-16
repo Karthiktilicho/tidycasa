@@ -1,12 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, Image, TouchableOpacity, FlatList, StatusBar, RefreshControl } from 'react-native';
+import React, {useState, useEffect} from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  FlatList,
+  StatusBar,
+  RefreshControl,
+} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import BottomNavBar from '../components/BottomNavBar';
-import { fetchSpaces } from '../utils/api';
+import {fetchSpaces} from '../utils/api';
 
 const defaultSpaceImage = require('../assets/images/Space_default.jpg');
 
-const SpaceScreen = ({ navigation }) => {
+const SpaceScreen = ({navigation}) => {
   const [spaces, setSpaces] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -14,11 +23,13 @@ const SpaceScreen = ({ navigation }) => {
     try {
       setRefreshing(true);
       const fetchedSpaces = await fetchSpaces();
-      setSpaces(fetchedSpaces.map(space => ({
-        ...space,
-        image: space.image || defaultSpaceImage,
-        productCount: space.productCount || 0
-      })));
+      setSpaces(
+        fetchedSpaces.map(space => ({
+          ...space,
+          image: space.image || defaultSpaceImage,
+          productCount: space.productCount || 0,
+        })),
+      );
     } catch (error) {
       console.error('Failed to fetch spaces:', error);
     } finally {
@@ -30,34 +41,36 @@ const SpaceScreen = ({ navigation }) => {
     loadSpaces();
   }, []);
 
-  const renderSpaceItem = ({ item }) => {
+  const renderSpaceItem = ({item}) => {
     // Ensure comprehensive space object is passed
     const spaceDetails = {
       id: item.id || item.space_id,
       title: item.space_name || item.title || item.name || 'Untitled Space',
       description: item.description || '',
-      image: item.space_image || item.image || require('../assets/images/placeholder.png'),
+      image:
+        item.space_image ||
+        item.image ||
+        require('../assets/images/placeholder.png'),
       items_count: item.items_count || 0,
-      total_worth: item.total_worth || 0
+      total_worth: item.total_worth || 0,
     };
 
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.spaceCard}
         onPress={() => {
           // Navigate to individual space with full details
-          navigation.navigate('Individual Space', { 
-            space: spaceDetails 
+          navigation.navigate('IndividualSpace', {
+            space: spaceDetails,
           });
-        }}
-      >
-        <Image 
+        }}>
+        <Image
           source={
-            typeof spaceDetails.image === 'string' 
-              ? { uri: spaceDetails.image } 
+            typeof spaceDetails.image === 'string'
+              ? {uri: spaceDetails.image}
               : spaceDetails.image
-          } 
-          style={styles.spaceImage} 
+          }
+          style={styles.spaceImage}
           defaultSource={require('../assets/images/placeholder.png')}
         />
         <View style={styles.spaceInfo}>
@@ -65,7 +78,8 @@ const SpaceScreen = ({ navigation }) => {
             {spaceDetails.title}
           </Text>
           <Text style={styles.productCount}>
-            {spaceDetails.items_count} <Text style={styles.productCountLabel}>Products</Text>
+            {spaceDetails.items_count}{' '}
+            <Text style={styles.productCountLabel}>Products</Text>
           </Text>
         </View>
       </TouchableOpacity>
@@ -75,20 +89,16 @@ const SpaceScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#6B46C1" barStyle="light-content" />
-      
+
       {/* Header */}
-      <LinearGradient
-        colors={['#6B46C1', '#9F7AEA']}
-        style={styles.header}
-      >
+      <LinearGradient colors={['#6B46C1', '#9F7AEA']} style={styles.header}>
         <Text style={styles.headerTitle}>Spaces</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.addButton}
-          onPress={() => navigation.navigate('ProductUpload')}
-        >
-          <Image 
+          onPress={() => navigation.navigate('ProductUpload')}>
+          <Image
             source={require('../assets/images/Nav/Add.png')}
-            style={[styles.addIcon, { tintColor: '#FFFFFF' }]}
+            style={[styles.addIcon, {tintColor: '#FFFFFF'}]}
           />
           <Text style={styles.addText}>Add Space</Text>
         </TouchableOpacity>
