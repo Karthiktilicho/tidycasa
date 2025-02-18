@@ -30,14 +30,52 @@ const HomeScreen = () => {
 
   console.log(route.params, 'parmas');
   const [products, setProducts] = useState([]);
+  const [spaceName, setSpaceName] = useState('');
+  const [error, setError] = useState(null);
   const {userToken} = useAuth();
-
-  console.log(products, 'spaces');
 
   const fetchProducts = async () => {
     try {
+      // Reset previous errors
+      setError(null);
+
       const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No access token found');
+      }
+
       console.log('Fetching products with token:', token);
+      
+      // Fetch space details first to get space name
+      let spaceResponse;
+      try {
+        spaceResponse = await axios.get(
+          `${BASE_URL}/spaces/${route.params.spaceId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            timeout: 10000, // 10 seconds timeout
+          },
+        );
+      } catch (spaceError) {
+        console.error('Space Fetch Error:', {
+          status: spaceError.response?.status,
+          data: spaceError.response?.data,
+          message: spaceError.message,
+        });
+        
+        // Set a default space name if fetch fails
+        setSpaceName('Space');
+      }
+      
+      // Set space name from response
+      if (spaceResponse?.data?.data) {
+        setSpaceName(spaceResponse.data.data.space_name || 'Space');
+      }
+
+      // Fetch products
       const response = await axios.get(
         `${BASE_URL}/spaces/${route.params.spaceId}/products`,
         {
@@ -45,27 +83,45 @@ const HomeScreen = () => {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
+          timeout: 10000, // 10 seconds timeout
         },
       );
+
+      // Detailed logging of API response
       console.log(
         'Raw Products API Response:',
         JSON.stringify(response.data, null, 2),
       );
 
+      // Validate response data
+      if (!response.data || (!response.data.data && !response.data.length)) {
+        console.warn('No products data received');
+        setProducts([]);
+        return;
+      }
+
       // Map the data using product fields from the API response
       const productsData = (response.data?.data || response.data || [])
-        .map(product => ({
-          id: product.product_id,
-          name: product.product_name || 'Unnamed Product',
-          description: product.description || '',
-          image:
-            product.primary_image_url ||
-            require('../assets/images/placeholder.png'),
-          price: product.price,
-          owner_id: product.owner_id,
-          space_id: product.space_id,
-          created_at: product.created_at,
-        }))
+        .map(product => {
+          // Validate each product
+          if (!product) {
+            console.warn('Skipping invalid product:', product);
+            return null;
+          }
+          return {
+            id: product.product_id,
+            name: product.product_name || 'Unnamed Product',
+            description: product.description || '',
+            image:
+              product.primary_image_url ||
+              require('../assets/images/placeholder.png'),
+            price: parseFloat(product.price) || 0,
+            owner_id: product.owner_id,
+            space_id: product.space_id,
+            created_at: product.created_at,
+          };
+        })
+        .filter(product => product !== null) // Remove any null products
         .sort(
           (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
         );
@@ -74,14 +130,29 @@ const HomeScreen = () => {
         'Processed Products Data:',
         JSON.stringify(productsData, null, 2),
       );
-      setProducts(productsData); // or setSpaces(productsData) if you're still using that state variable
+      
+      setProducts(productsData);
     } catch (error) {
-      console.error(
-        'Error fetching products:',
-        error.response?.data || error.message,
-      );
-      // Optionally set empty array or show error to user
-      setProducts([]); // or setSpaces([])
+      // Comprehensive error handling
+      console.error('Comprehensive Error Details:', {
+        name: error.name,
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        headers: error.response?.headers,
+      });
+
+      // Set user-friendly error state
+      setError({
+        message: error.response?.data?.message || 
+                 error.message || 
+                 'An unexpected error occurred while fetching space details',
+        status: error.response?.status
+      });
+
+      // Fallback states
+      setProducts([]);
+      setSpaceName('Space');
     }
   };
 
@@ -89,25 +160,61 @@ const HomeScreen = () => {
     if (userToken) {
       fetchProducts();
     }
-  }, [userToken]);
+  }, [userToken, route.params.spaceId]);
+
+  // Calculate total products and total price
+  const totalProductCount = products.length;
+  const totalPrice = products.reduce((sum, product) => sum + product.price, 0);
+
+  // Render error message if exists
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Image
+              source={require('../assets/images/arrow_back.png')}
+              style={styles.backIcon}
+            />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Error</Text>
+        </View>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>
+            {error.status ? `Error ${error.status}: ` : ''}
+            {error.message}
+          </Text>
+          <TouchableOpacity 
+            style={styles.retryButton} 
+            onPress={fetchProducts}
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   const renderSpaceCard = ({item}) => (
     <TouchableOpacity
-      style={styles.spaceCard}
-      onPress={() =>
+      style={styles.productCard}
+      onPress={() => {
+        console.log('Navigating to SingleProduct with ID:', item.id);
         navigation.navigate('IndividualProductScreen', {
-          spaceId: item.id,
-          spaceName: item.name,
-        })
-      }>
+          productId: item.id,
+          productName: item.name,
+        });
+      }}>
       <Image
         source={typeof item.image === 'number' ? item.image : {uri: item.image}}
-        style={styles.spaceImage}
+        style={styles.productImage}
         resizeMode="cover"
       />
-      <View style={styles.spaceOverlay}>
-        <Text style={styles.spaceName}>{item.name}</Text>
-        <Text style={styles.itemCount}>{item.items_count} Items</Text>
+      <View style={styles.productOverlay}>
+        <Text style={styles.productName} numberOfLines={2}>
+          {item.name}
+        </Text>
+        <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -119,17 +226,20 @@ const HomeScreen = () => {
           onPress={() => {
             navigation.goBack();
           }}>
-          <Text style={styles.iconText}>←</Text>
+          <Image
+            source={require('../assets/images/arrow_back.png')}
+            style={styles.backIcon}
+          />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Space Details</Text>
+        <Text style={styles.headerTitle}>{spaceName}</Text>
       </View>
       <View style={styles.summaryContainer}>
         <View style={[styles.summaryCard, {backgroundColor: '#FFE8D6'}]}>
-          <Text style={styles.summaryNumber}>0</Text>
+          <Text style={styles.summaryNumber}>{totalProductCount}</Text>
           <Text style={styles.summaryLabel}>Total Items</Text>
         </View>
         <View style={[styles.summaryCard, {backgroundColor: '#E8F4F8'}]}>
-          <Text style={styles.summaryNumber}>$0</Text>
+          <Text style={styles.summaryNumber}>${totalPrice.toFixed(2)}</Text>
           <Text style={styles.summaryLabel}>Total Worth</Text>
         </View>
         <View style={[styles.summaryCard, {backgroundColor: '#F0E6FF'}]}>
@@ -138,15 +248,7 @@ const HomeScreen = () => {
         </View>
       </View>
 
-      <View style={styles.spacesContainer}>
-        {/* <View style={styles.headerRow}>
-          <Text style={styles.sectionTitle}>Spaces</Text>
-          {spaces.length > 3 && (
-            <TouchableOpacity onPress={() => navigation.navigate('Spaces')}>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
-          )}
-        </View> */}
+      <View style={styles.productsContainer}>
         <FlatList
           data={products}
           renderItem={renderSpaceCard}
@@ -157,10 +259,11 @@ const HomeScreen = () => {
           }
           numColumns={2}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.carouselContent}
+          contentContainerStyle={styles.productGridContent}
+          columnWrapperStyle={styles.productGridRow}
           ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No spaces found</Text>
+              <Text style={styles.emptyText}>No products found</Text>
             </View>
           )}
         />
@@ -177,118 +280,114 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    // justifyContent: 'space-between',
-    // alignItems: 'center',
+    alignItems: 'center',
     gap: 16,
     padding: 16,
-    // backgroundColor: '#F2E6DF',
-    // position: 'absolute',
     width: '100%',
-    // height: 289,
-
-    // zIndex: 100,
   },
-
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#333',
+    flex: 1,
   },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  logo: {
-    height: 32,
-    width: 120,
-    resizeMode: 'contain',
-    tintColor: '#fff',
+  backIcon: {
+    width: 24,
+    height: 24,
   },
   summaryContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 16,
-    marginTop: -9,
+    paddingHorizontal: 16,
+    marginBottom: 16,
   },
   summaryCard: {
-    width: (width - 48) / 3,
-    padding: 16,
-    borderRadius: 12,
+    width: '30%',
+    padding: 12,
+    borderRadius: 10,
     alignItems: 'center',
   },
   summaryNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
   },
   summaryLabel: {
     fontSize: 12,
     color: '#666',
+    marginTop: 4,
   },
-  spacesContainer: {
+  productsContainer: {
     flex: 1,
-
-    // paddingVertical: 20,
+    paddingHorizontal: 8,
   },
-  carouselContent: {
-    paddingHorizontal: 15,
+  productGridContent: {
+    paddingBottom: 16,
   },
-  spaceCard: {
-    width: cardWidth,
-    aspectRatio: 1, // Ensures a square shape
-    margin: cardMargin / 2,
-    borderRadius: 15,
-    backgroundColor: '#F5F5F5',
+  productGridRow: {
+    justifyContent: 'space-between',
+  },
+  productCard: {
+    width: '48%',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    marginBottom: 16,
+    elevation: 1,
+  },
+  productImage: {
+    width: '100%',
+    height: 120, // Reduced height for minimal grid
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  productOverlay: {
+    padding: 8,
+  },
+  productName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+    height: 36, // Fixed height to maintain consistent layout
     overflow: 'hidden',
-    flex: 1,
   },
-  spaceImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  spaceOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    width: '100%',
-    padding: 2,
-    paddingLeft: 10,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-  },
-  spaceName: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  productPrice: {
+    fontSize: 12,
+    color: '#6B46C1',
     fontWeight: '600',
   },
-  itemCount: {
-    color: '#FFFFFF',
-    fontSize: 14,
-  },
   emptyContainer: {
-    width: width - 10,
-    height: 200,
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 15,
+    marginTop: 50,
   },
   emptyText: {
     fontSize: 16,
     color: '#666',
   },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 10,
+    padding: 20,
   },
-  sectionTitle: {
+  errorText: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    color: '#666',
+    marginBottom: 20,
+    textAlign: 'center',
   },
-  seeAllText: {
-    fontSize: 14,
-    color: '#6B46C1',
+  retryButton: {
+    backgroundColor: '#6B46C1',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    elevation: 2,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    color: '#FFFFFF',
     fontWeight: '600',
   },
 });

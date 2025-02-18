@@ -30,67 +30,107 @@ const HomeScreen = () => {
   const [totalItems, setTotalItems] = useState(0);
   const [totalWorth, setTotalWorth] = useState(0);
 
-  console.log(spaces, 'spaces');
+  const fetchSpaceDetails = async (spaceId, token) => {
+    try {
+      // Fetch detailed information for each space
+      const detailResponse = await axios.get(`${BASE_URL}/spaces/${spaceId}/products`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const products = detailResponse.data?.data || detailResponse.data || [];
+      
+      return {
+        items_count: products.length,
+        total_worth: products.reduce((sum, product) => 
+          sum + (parseFloat(product.price) || 0), 0),
+        primary_image: products.length > 0 
+          ? (products[0].primary_image_url || null)
+          : null
+      };
+    } catch (error) {
+      console.error(`Error fetching space ${spaceId} details:`, error.message);
+      return {
+        items_count: 0,
+        total_worth: 0,
+        primary_image: null
+      };
+    }
+  };
 
   const fetchSpaces = async () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
       console.log('Fetching spaces with token:', token);
+      
       const response = await axios.get(`${BASE_URL}/spaces/user`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
+
       console.log(
         'Raw Spaces API Response:',
         JSON.stringify(response.data, null, 2),
       );
 
-      // Normalize data to ensure consistent structure
-      const spacesData = (response.data?.data || response.data || [])
-        .map(space => ({
-          id: space.id || space.space_id,
-          name:
-            space.space_name || space.name || space.title || 'Untitled Space',
-          description: space.description || '',
-          image:
-            space.space_image ||
-            space.image ||
-            require('../assets/images/placeholder.png'),
-          items_count: space.items_count || 0,
-          total_worth: space.total_worth || 0,
-          created_at: space.created_at,
-        }))
-        .sort(
-          (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
-        );
+      // Fetch details for each space concurrently
+      const spacesWithDetails = await Promise.all(
+        (response.data?.data || response.data || []).map(async (space) => {
+          const details = await fetchSpaceDetails(
+            space.id || space.space_id, 
+            token
+          );
+
+          return {
+            id: space.id || space.space_id,
+            name: space.space_name || space.name || space.title || 'Untitled Space',
+            description: space.description || '',
+            image: details.primary_image || 
+              space.space_image ||
+              space.image ||
+              require('../assets/images/placeholder.png'),
+            items_count: details.items_count,
+            total_worth: details.total_worth,
+            created_at: space.created_at,
+          };
+        })
+      );
+
+      // Sort spaces by creation date
+      const sortedSpaces = spacesWithDetails.sort(
+        (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)
+      );
+
+      // Calculate total items and worth
+      const totalItemsCount = sortedSpaces.reduce(
+        (sum, space) => sum + (space.items_count || 0),
+        0
+      );
+      const totalSpacesWorth = sortedSpaces.reduce(
+        (sum, space) => sum + (space.total_worth || 0),
+        0
+      );
+
+      setSpaces(sortedSpaces);
+      setTotalItems(totalItemsCount);
+      setTotalWorth(totalSpacesWorth);
 
       console.log(
         'Processed Spaces Data:',
-        JSON.stringify(spacesData, null, 2),
+        JSON.stringify(sortedSpaces, null, 2),
       );
-      setSpaces(spacesData);
-
-      // Calculate total items and worth
-      const items = spacesData.reduce(
-        (sum, space) => sum + (space.items_count || 0),
-        0,
-      );
-      const worth = spacesData.reduce(
-        (sum, space) => sum + (space.total_worth || 0),
-        0,
-      );
-
-      setTotalItems(items);
-      setTotalWorth(worth);
     } catch (error) {
       console.error(
         'Error fetching spaces:',
         error.response?.data || error.message,
       );
-      // Optionally set empty array or show error to user
       setSpaces([]);
+      setTotalItems(0);
+      setTotalWorth(0);
     }
   };
 
@@ -112,37 +152,66 @@ const HomeScreen = () => {
         JSON.stringify(response.data, null, 2),
       );
 
-      // Normalize data to ensure consistent structure
-      const collectionsData = (response.data?.data || response.data || [])
-        .map(collection => ({
-          id: collection.id || collection.collection_id,
-          name:
-            collection.collection_name ||
-            collection.name ||
-            'Untitled Collection',
-          description: collection.description || '',
-          image:
-            collection.collection_image ||
-            collection.image ||
-            require('../assets/images/placeholder.png'),
-          items_count: collection.items_count || 0,
-          created_at: collection.created_at,
-        }))
-        .sort(
-          (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
-        );
+      // Fetch details for each collection concurrently
+      const collectionsWithDetails = await Promise.all(
+        (response.data?.data || response.data || []).map(async (collection) => {
+          try {
+            // Fetch products for each collection
+            const productsResponse = await axios.get(
+              `${BASE_URL}/collections/${collection.id}/products`,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+              }
+            );
+
+            const products = productsResponse.data?.data || productsResponse.data || [];
+
+            return {
+              id: collection.id || collection.collection_id,
+              name: collection.collection_name || collection.name || 'Untitled Collection',
+              description: collection.description || '',
+              image: products.length > 0 
+                ? (products[0].primary_image_url || null)
+                : (collection.collection_image || collection.image || require('../assets/images/placeholder.png')),
+              items_count: products.length,
+              total_worth: products.reduce((sum, product) => 
+                sum + (parseFloat(product.price) || 0), 0),
+              created_at: collection.created_at,
+            };
+          } catch (detailError) {
+            console.error(`Error fetching collection ${collection.id} details:`, detailError.message);
+            return {
+              id: collection.id || collection.collection_id,
+              name: collection.collection_name || collection.name || 'Untitled Collection',
+              description: collection.description || '',
+              image: collection.collection_image || collection.image || require('../assets/images/placeholder.png'),
+              items_count: 0,
+              total_worth: 0,
+              created_at: collection.created_at,
+            };
+          }
+        })
+      );
+
+      // Sort collections by creation date
+      const sortedCollections = collectionsWithDetails.sort(
+        (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)
+      );
+
+      setCollections(sortedCollections);
 
       console.log(
         'Processed Collections Data:',
-        JSON.stringify(collectionsData, null, 2),
+        JSON.stringify(sortedCollections, null, 2),
       );
-      setCollections(collectionsData);
     } catch (error) {
       console.error(
         'Error fetching collections:',
         error.response?.data || error.message,
       );
-      // Optionally set empty array or show error to user
       setCollections([]);
     }
   };
@@ -169,8 +238,12 @@ const HomeScreen = () => {
         resizeMode="cover"
       />
       <View style={styles.spaceOverlay}>
-        <Text style={styles.spaceName}>{item.name}</Text>
-        <Text style={styles.itemCount}>{item.items_count} Items</Text>
+        <Text style={styles.spaceName} numberOfLines={1}>
+          {item.name}
+        </Text>
+        <Text style={styles.itemCount}>
+          {item.items_count || 0} Items
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -178,26 +251,30 @@ const HomeScreen = () => {
   const renderCollectionCard = ({item}) => (
     <TouchableOpacity
       style={styles.spaceCard}
-      onPress={() =>
+      onPress={() => {
+        console.log('Navigating to CollectionDetail with ID:', item.id);
         navigation.navigate('CollectionDetail', {
           collection: {
             id: item.id,
             name: item.name,
             description: item.description,
-            image:
-              typeof item.image === 'number' ? item.image : {uri: item.image},
+            image: typeof item.image === 'number' ? item.image : {uri: item.image},
             items_count: item.items_count,
           },
-        })
-      }>
+        });
+      }}>
       <Image
         source={typeof item.image === 'number' ? item.image : {uri: item.image}}
         style={styles.spaceImage}
         resizeMode="cover"
       />
       <View style={styles.spaceOverlay}>
-        <Text style={styles.spaceName}>{item.name}</Text>
-        <Text style={styles.itemCount}>{item.items_count} Items</Text>
+        <Text style={styles.spaceName} numberOfLines={1}>
+          {item.name}
+        </Text>
+        <Text style={styles.itemCount}>
+          {item.items_count || 0} Items
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -219,12 +296,14 @@ const HomeScreen = () => {
           <Text style={styles.summaryLabel}>Total Items</Text>
         </View>
         <View style={[styles.summaryCard, {backgroundColor: '#E8F4F8'}]}>
-          <Text style={styles.summaryNumber}>{spaces.length}</Text>
-          <Text style={styles.summaryLabel}>Spaces</Text>
+          <Text style={styles.summaryNumber}>
+            ${totalWorth.toFixed(2)}
+          </Text>
+          <Text style={styles.summaryLabel}>Total Worth</Text>
         </View>
         <View style={[styles.summaryCard, {backgroundColor: '#F0E6FF'}]}>
-          <Text style={styles.summaryNumber}>${totalWorth}</Text>
-          <Text style={styles.summaryLabel}>Total Worth</Text>
+          <Text style={styles.summaryNumber}>{spaces.length}</Text>
+          <Text style={styles.summaryLabel}>Spaces</Text>
         </View>
       </View>
 

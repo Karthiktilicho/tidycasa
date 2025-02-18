@@ -7,7 +7,8 @@ import {
   TouchableOpacity, 
   Image, 
   StatusBar,
-  ActivityIndicator
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import axios from 'axios';
@@ -84,10 +85,23 @@ const ChangePasswordScreen = ({ navigation }) => {
         );
 
         if (response.data) {
-          navigation.goBack(); // Navigate back to previous screen
+          Alert.alert(
+            'Success',
+            'Password changed successfully!',
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.goBack()
+              }
+            ]
+          );
         }
       } catch (error) {
         console.error('Password change error:', error.response?.data || error.message);
+        Alert.alert(
+          'Error',
+          error.response?.data?.message || 'Failed to change password'
+        );
       } finally {
         setIsLoading(false);
       }
