@@ -19,11 +19,11 @@ import BottomNavBar from '../components/BottomNavBar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 const BASE_URL = 'http://13.49.68.11:3000';
-const ProductUpload = ({navigation}) => {
+const ProductUpload = ({navigation, route}) => {
   const [images, setImages] = useState([]);
-  const [productName, setProductName] = useState('');
-  const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
+  const [productName, setProductName] = useState(route.params?.prefillData?.title || '');
+  const [description, setDescription] = useState(route.params?.prefillData?.description || '');
+  const [price, setPrice] = useState(route.params?.prefillData?.price || '');
   const [selectedSpace, setSelectedSpace] = useState(null);
   const [showSpaceInput, setShowSpaceInput] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState('');
@@ -105,78 +105,105 @@ const ProductUpload = ({navigation}) => {
     }
   };
 
-  const handleCamera = async () => {
-    try {
-      // Request camera permission for Android
-      if (Platform.OS === 'android') {
-        const cameraPermission = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.CAMERA,
-          {
-            title: 'Camera Permission',
-            message: 'This app needs access to your camera to take photos.',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'OK',
-          },
-        );
+  const handleImagePick = async () => {
+    if (await checkAndroidPermissions()) {
+      const options = {
+        mediaType: 'photo',
+        includeBase64: false,
+        maxHeight: 800,
+        maxWidth: 800,
+        quality: 0.7,
+      };
 
-        if (cameraPermission !== PermissionsAndroid.RESULTS.GRANTED) {
-          Alert.alert(
-            'Permission Denied',
-            'You need to grant camera permission to take photos',
-          );
+      launchImageLibrary(options, async response => {
+        if (response.didCancel) {
           return;
         }
-      }
 
-      const result = await launchCamera({
-        mediaType: 'photo',
-        quality: 0.8,
-        saveToPhotos: true,
-        includeBase64: true,
-        cameraType: 'back',
+        if (response.errorCode) {
+          console.error('Image picker error:', {
+            code: response.errorCode,
+            message: response.errorMessage
+          });
+          Alert.alert('Error', 'Failed to pick image');
+          return;
+        }
+
+        try {
+          const selectedImage = response.assets[0];
+          console.log('Selected image details:', {
+            uri: selectedImage.uri,
+            type: selectedImage.type,
+            fileSize: selectedImage.fileSize,
+            width: selectedImage.width,
+            height: selectedImage.height
+          });
+
+          setImages([...images, selectedImage]);
+          
+          // Navigate to OnlineProductSearchScreen with the selected image
+          navigation.navigate('OnlineProductSearch', {
+            imageUri: selectedImage.uri,
+            imageType: selectedImage.type || 'image/jpeg',
+            returnToUpload: true
+          });
+        } catch (error) {
+          console.error('Error processing image:', error);
+          Alert.alert('Error', 'Failed to process the selected image');
+        }
       });
-
-      if (result.didCancel) {
-        console.log('User cancelled camera');
-      } else if (result.errorCode) {
-        console.error('Camera Error:', result.errorMessage);
-        Alert.alert('Error', 'Failed to take photo: ' + result.errorMessage);
-      } else if (result.assets && result.assets[0]) {
-        const newImage = result.assets[0];
-        setImages([...images, newImage]);
-      }
-    } catch (error) {
-      console.error('Camera Error:', error);
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
     }
-    setShowImageOptions(false);
   };
 
-  const handleGallery = async () => {
-    try {
-      const hasPermission = await checkAndroidPermissions();
-      if (!hasPermission) return;
-
-      const result = await launchImageLibrary({
+  const handleCameraLaunch = async () => {
+    if (await checkAndroidPermissions()) {
+      const options = {
         mediaType: 'photo',
-        quality: 0.8,
-        selectionLimit: 0,
-        includeBase64: true,
-      });
+        includeBase64: false,
+        maxHeight: 800,
+        maxWidth: 800,
+        quality: 0.7,
+        saveToPhotos: true,
+      };
 
-      if (result.didCancel) {
-        console.log('User cancelled image selection');
-      } else if (result.errorCode) {
-        Alert.alert('Error', 'Failed to select photos: ' + result.errorMessage);
-      } else if (result.assets) {
-        setImages([...images, ...result.assets]);
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to select photos. Please try again.');
-      console.log('Gallery Error: ', error);
+      launchCamera(options, async response => {
+        if (response.didCancel) {
+          return;
+        }
+
+        if (response.errorCode) {
+          console.error('Camera error:', {
+            code: response.errorCode,
+            message: response.errorMessage
+          });
+          Alert.alert('Error', 'Failed to capture image');
+          return;
+        }
+
+        try {
+          const selectedImage = response.assets[0];
+          console.log('Captured image details:', {
+            uri: selectedImage.uri,
+            type: selectedImage.type,
+            fileSize: selectedImage.fileSize,
+            width: selectedImage.width,
+            height: selectedImage.height
+          });
+
+          setImages([...images, selectedImage]);
+
+          // Navigate to OnlineProductSearchScreen with the captured image
+          navigation.navigate('OnlineProductSearch', {
+            imageUri: selectedImage.uri,
+            imageType: selectedImage.type || 'image/jpeg',
+            returnToUpload: true
+          });
+        } catch (error) {
+          console.error('Error processing camera image:', error);
+          Alert.alert('Error', 'Failed to process the captured image');
+        }
+      });
     }
-    setShowImageOptions(false);
   };
 
   const handleAddSpace = () => {
@@ -546,6 +573,15 @@ const ProductUpload = ({navigation}) => {
           <View style={{width: 24}} />
         </View>
 
+        <TouchableOpacity 
+          style={styles.searchOnlineButton}
+          onPress={() => navigation.navigate('OnlineProductSearch')}
+        >
+          <Text style={styles.searchOnlineButtonText}>
+            Search Online Products
+          </Text>
+        </TouchableOpacity>
+
         {/* Image Upload Section */}
         <View style={styles.uploadSection}>
           <View style={styles.imageSection}>
@@ -591,12 +627,12 @@ const ProductUpload = ({navigation}) => {
           <View style={styles.buttonContainer}>
             <TouchableOpacity
               style={[styles.uploadOptionButton, styles.cameraButton]}
-              onPress={handleCamera}>
+              onPress={handleCameraLaunch}>
               <Text style={styles.uploadOptionText}>Take Photo</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.uploadOptionButton, styles.galleryButton]}
-              onPress={handleGallery}>
+              onPress={handleImagePick}>
               <Text style={styles.uploadOptionText}>Choose from Gallery</Text>
             </TouchableOpacity>
           </View>
@@ -732,13 +768,13 @@ const ProductUpload = ({navigation}) => {
           activeOpacity={1}
           onPress={() => setShowImageOptions(false)}>
           <View style={styles.modalContent}>
-            <TouchableOpacity style={styles.modalOption} onPress={handleCamera}>
+            <TouchableOpacity style={styles.modalOption} onPress={handleCameraLaunch}>
               <Text style={styles.modalOptionText}>Take Photo</Text>
             </TouchableOpacity>
             <View style={styles.modalDivider} />
             <TouchableOpacity
               style={styles.modalOption}
-              onPress={handleGallery}>
+              onPress={handleImagePick}>
               <Text style={styles.modalOptionText}>Choose from Gallery</Text>
             </TouchableOpacity>
             <View style={styles.modalDivider} />
@@ -1278,6 +1314,18 @@ const styles = StyleSheet.create({
   spaceItemCount: {
     fontSize: 12,
     color: '#999',
+  },
+  searchOnlineButton: {
+    margin: 16,
+    padding: 12,
+    backgroundColor: '#6B46C1',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  searchOnlineButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

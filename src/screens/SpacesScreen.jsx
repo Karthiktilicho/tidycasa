@@ -43,7 +43,7 @@ const SpacesScreen = ({ navigation }) => {
           name: space.space_name || space.name || 'Unnamed Space',
           description: space.description || '',
           space_image: space.space_image || null,
-          total_products: space.total_products || 0,
+          items_count: space.items_count || 0,
           created_at: space.created_at,
         }));
 
@@ -59,7 +59,16 @@ const SpacesScreen = ({ navigation }) => {
       }
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching spaces:', error.response?.data || error);
+      console.error('Error fetching spaces:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        config: error.config
+      });
+      Alert.alert(
+        'Error',
+        'Unable to fetch spaces. Please check your internet connection and try again.'
+      );
       setSpaces([]);
       setLoading(false);
     }
@@ -140,7 +149,7 @@ const SpacesScreen = ({ navigation }) => {
                     {space.name}
                   </Text>
                   <Text style={styles.itemCount}>
-                    {space.total_products || 0} Items
+                    {space.items_count || 0} Items
                   </Text>
                 </View>
               </TouchableOpacity>

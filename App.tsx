@@ -31,6 +31,7 @@ import SpacesScreen from './src/screens/SpacesScreen';
 import IndividualSpaceScreen from './src/screens/IndividualSpaceScreen';
 import ProductDetailsScreen from './src/screens/SingleProductScreen';
 import IndividualCollectionScreen from './src/screens/IndividualCollectionScreen';
+import OnlineProductSearchScreen from './src/screens/OnlineProductSearchScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -138,6 +139,13 @@ const AppStack = () => (
       name="IndividualCollection"
       component={IndividualCollectionScreen}
       options={{headerShown: false}}
+    />
+    <Stack.Screen
+      name="OnlineProductSearch"
+      component={OnlineProductSearchScreen}
+      options={{
+        headerShown: false,
+      }}
     />
   </>
 );
