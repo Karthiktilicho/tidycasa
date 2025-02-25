@@ -18,6 +18,7 @@ import SpaceScreen from '../screens/SpaceScreen';
 import IndividualSpaceScreen from '../screens/IndividualSpaceScreen';
 import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import ProductDetailsScreen from '../screens/SingleProductScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -137,6 +138,11 @@ const AppNavigator = () => {
             <Stack.Screen
               name="Individual Product Screen"
               component={ProductDetailsScreen}
+              options={{headerShown: false}}
+            />
+            <Stack.Screen
+              name="EditProfile"
+              component={EditProfileScreen}
               options={{headerShown: false}}
             />
           </>

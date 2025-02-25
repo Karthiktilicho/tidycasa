@@ -5,68 +5,103 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const EditProfileScreen = ({ navigation }) => {
-  const [profileImage, setProfileImage] = useState(require('../assets/images/profile.png'));
+const EditProfileScreen = ({ navigation, route }) => {
+  const { initialName, initialPhone, initialProfileImage } = route.params || {};
+  const [profileImage, setProfileImage] = useState(
+    initialProfileImage
+      ? { uri: initialProfileImage }
+      : require('../assets/images/profile.png')
+  );
   const [userProfile, setUserProfile] = useState({
-    name: '',
-    email: '',
-    phone: ''
+    name: initialName || '',
+    phone: initialPhone || ''
   });
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    fetchProfileDetails();
-  }, []);
-
-  const fetchProfileDetails = async () => {
-    try {
-      const token = await AsyncStorage.getItem('userToken');
-      const response = await axios.get('http://13.49.68.11:3000/profile', {
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const { name, email, phone } = response.data;
-      setUserProfile({
-        name: name || '',
-        email: email || '',
-        phone: phone || ''
-      });
-    } catch (error) {
-      console.error('Failed to fetch profile:', error);
-      Alert.alert('Error', 'Failed to load profile details');
+    // Update profile image when route params change
+    if (route.params?.initialProfileImage) {
+      setProfileImage({ uri: route.params.initialProfileImage });
     }
-  };
+  }, [route.params?.initialProfileImage]);
 
   const handleUpdateProfile = async () => {
-    if (!userProfile.name || !userProfile.email) {
-      Alert.alert('Error', 'Name and Email are required');
+    if (!userProfile.name) {
+      Alert.alert('Error', 'Name is required');
       return;
     }
 
     setIsLoading(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
-      const response = await axios.post('http://13.49.68.11:3000/profile/update-profile', 
-        {
-          name: userProfile.name,
-          email: userProfile.email,
-          phone: userProfile.phone
-        },
+      const token = await AsyncStorage.getItem('token');
+      if (!token) throw new Error('No token found');
+      
+      const formData = new FormData();
+      formData.append('username', userProfile.name);
+      formData.append('phone_number', userProfile.phone);
+
+      // Only append profile image if it's from gallery (has uri)
+      if (profileImage.uri && !profileImage.uri.startsWith('http')) {
+        const imageFile = {
+          uri: profileImage.uri,
+          type: 'image/jpeg',
+          name: 'profile_image.jpg'
+        };
+        console.log('Uploading image:', imageFile);
+        formData.append('profile_image', imageFile);
+      }
+
+      console.log('Sending form data:', formData);
+      const response = await axios.put(
+        'http://13.49.68.11:3000/profile/update-profile',
+        formData,
         {
           headers: { 
             'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'multipart/form-data',
+            'Accept': 'application/json'
           }
         }
       );
 
-      Alert.alert('Success', 'Profile updated successfully');
-      navigation.goBack();
+      console.log('Update response:', response.data);
+
+      if (response.data) {
+        // Get the updated profile to ensure we have the latest data
+        const profileResponse = await axios.get('http://13.49.68.11:3000/profile', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const updatedProfileData = profileResponse.data.data;
+        
+        Alert.alert(
+          'Success',
+          'Profile updated successfully',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Navigate back with the latest profile data
+                navigation.navigate('Profile', { 
+                  refresh: true,
+                  updatedProfile: {
+                    name: updatedProfileData.name,
+                    phone: updatedProfileData.phone_number,
+                    profile_image: updatedProfileData.profile_image
+                  }
+                });
+              }
+            }
+          ],
+          { cancelable: false }
+        );
+      }
     } catch (error) {
       console.error('Failed to update profile:', error);
+      console.error('Error response:', error.response?.data);
       Alert.alert('Error', error.response?.data?.message || 'Failed to update profile');
     } finally {
       setIsLoading(false);
@@ -76,7 +111,7 @@ const EditProfileScreen = ({ navigation }) => {
   const handleImagePick = async () => {
     const options = {
       mediaType: 'photo',
-      quality: 1,
+      quality: 0.8,
       selectionLimit: 1,
     };
 
@@ -93,9 +128,22 @@ const EditProfileScreen = ({ navigation }) => {
       }
 
       if (result.assets && result.assets[0]) {
-        setProfileImage({ uri: result.assets[0].uri });
+        const selectedImage = result.assets[0];
+        // Check file size (limit to 5MB)
+        if (selectedImage.fileSize > 5 * 1024 * 1024) {
+          Alert.alert('Error', 'Image size should be less than 5MB');
+          return;
+        }
+
+        console.log('Selected image:', selectedImage);
+        setProfileImage({ 
+          uri: selectedImage.uri,
+          type: selectedImage.type || 'image/jpeg',
+          name: selectedImage.fileName || 'profile_image.jpg'
+        });
       }
     } catch (error) {
+      console.error('Image picker error:', error);
       Alert.alert('Error', 'Failed to pick image');
     }
   };
@@ -104,7 +152,6 @@ const EditProfileScreen = ({ navigation }) => {
     <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
       <StatusBar backgroundColor="#6B46C1" barStyle="light-content" />
       
-      {/* Header with Gradient */}
       <LinearGradient
         colors={['#6B46C1', '#9F7AEA']}
         style={styles.header}
@@ -122,7 +169,6 @@ const EditProfileScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Profile Image */}
         <View style={styles.profileImageContainer}>
           <Image 
             source={profileImage}
@@ -140,7 +186,6 @@ const EditProfileScreen = ({ navigation }) => {
         </View>
       </LinearGradient>
 
-      {/* Form Fields */}
       <View style={styles.formContainer}>
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Name</Text>
@@ -150,18 +195,6 @@ const EditProfileScreen = ({ navigation }) => {
             onChangeText={(text) => setUserProfile(prev => ({ ...prev, name: text }))}
             placeholderTextColor="#666666"
             placeholder="Enter your name"
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Email Address</Text>
-          <TextInput
-            style={styles.input}
-            value={userProfile.email}
-            onChangeText={(text) => setUserProfile(prev => ({ ...prev, email: text }))}
-            keyboardType="email-address"
-            placeholderTextColor="#666666"
-            placeholder="Enter your email"
           />
         </View>
 
@@ -200,9 +233,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   headerTitle: {
-    color: '#FFFFFF',
     fontSize: 20,
     fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  saveText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
   },
   icon: {
     width: 24,
@@ -210,43 +248,34 @@ const styles = StyleSheet.create({
   },
   profileImageContainer: {
     alignItems: 'center',
-    position: 'relative',
-    width: 100,
-    height: 100,
-    alignSelf: 'center',
+    marginTop: 10,
   },
   profileImage: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
   },
   editIconContainer: {
     position: 'absolute',
-    right: 0,
+    right: '35%',
     bottom: 0,
-    padding: 4,
-    zIndex: 1,
-    width: 30,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 15,
+    padding: 8,
+    elevation: 3,
   },
   editIcon: {
-    width: 30,
-    height: 30,
+    width: 20,
+    height: 20,
   },
   formContainer: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 30,
+    padding: 16,
   },
   inputGroup: {
     marginBottom: 20,
   },
   label: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#333333',
     marginBottom: 8,
     fontWeight: '500',
@@ -260,11 +289,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333333',
     backgroundColor: '#FFFFFF',
-  },
-  saveText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });
 
