@@ -1,17 +1,18 @@
-import React, { useState } from 'react';
+import axios from 'axios';
+import React, {useState} from 'react';
 import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
   StyleSheet,
-  View,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
+  View,
 } from 'react-native';
-import axios from 'axios';
+import Snackbar from 'react-native-snackbar';
 
-function RegisterScreen({ navigation }) {
+function RegisterScreen({navigation}) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -43,7 +44,9 @@ function RegisterScreen({ navigation }) {
   };
 
   const handleRegister = async () => {
-    if (!validateInputs()) return;
+    if (!validateInputs()) {
+      return;
+    }
 
     setLoading(true);
     try {
@@ -54,14 +57,22 @@ function RegisterScreen({ navigation }) {
 
       if (response.data) {
         Alert.alert('Success', 'Registration successful! Please login.', [
-          { text: 'OK', onPress: () => navigation.navigate('Login') }
+          {text: 'OK', onPress: () => navigation.navigate('Login')},
         ]);
       }
     } catch (error) {
-      Alert.alert(
-        'Registration Failed',
-        error.response?.data?.message || 'An error occurred during registration'
-      );
+      // Alert.alert(
+      //   'Registration Failed',
+      //   error.response?.data?.message ||
+      //     'An error occurred during registration',
+      // );
+      Snackbar.show({
+        text:
+          error.response?.data?.message ||
+          'An error occurred during registration',
+        duration: Snackbar.LENGTH_SHORT,
+        marginBottom: 10,
+      });
     } finally {
       setLoading(false);
     }
@@ -100,8 +111,7 @@ function RegisterScreen({ navigation }) {
         <TouchableOpacity
           style={styles.button}
           onPress={handleRegister}
-          disabled={loading}
-        >
+          disabled={loading}>
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
@@ -111,8 +121,7 @@ function RegisterScreen({ navigation }) {
 
         <TouchableOpacity
           style={styles.linkButton}
-          onPress={() => navigation.navigate('Login')}
-        >
+          onPress={() => navigation.navigate('Login')}>
           <Text style={styles.linkText}>Already have an account? Login</Text>
         </TouchableOpacity>
       </View>

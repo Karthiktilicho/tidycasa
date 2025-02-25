@@ -1,10 +1,21 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, Image, StatusBar, Alert, ActivityIndicator } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
-import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuth } from '../context/AuthContext';
-import { useNavigation } from '@react-navigation/native';
+import {useNavigation} from '@react-navigation/native';
+import axios from 'axios';
+import React, {useEffect, useState} from 'react';
+import {
+  ActivityIndicator,
+  Image,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import Snackbar from 'react-native-snackbar';
+import {useAuth} from '../context/AuthContext';
 
 const BASE_URL = 'http://13.49.68.11:3000';
 
@@ -20,7 +31,7 @@ const BackgroundPattern = () => (
       colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
       start={{x: 0, y: 0}}
       end={{x: 1, y: 1}}
-      style={[styles.diagonalStripe, { top: '30%' }]}
+      style={[styles.diagonalStripe, {top: '30%'}]}
     />
   </View>
 );
@@ -32,9 +43,10 @@ function LoginScreen() {
   const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const [isFormValid, setIsFormValid] = useState(false);
+  const {signIn} = useAuth();
 
-  const validateEmail = (email) => {
+  const validateEmail = email => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
@@ -46,17 +58,32 @@ function LoginScreen() {
   const handleLogin = async () => {
     // Validate inputs first
     if (!email.trim()) {
-      Alert.alert('Validation Error', 'Please enter your email');
+      // Alert.alert('Validation Error', 'Please enter your email');
+      Snackbar.show({
+        text: 'Please enter your email',
+        duration: Snackbar.LENGTH_SHORT,
+        marginBottom: 10,
+      });
       return;
     }
 
     if (!password) {
-      Alert.alert('Validation Error', 'Please enter your password');
+      // Alert.alert('Validation Error', 'Please enter your password');
+      Snackbar.show({
+        text: 'Please enter your password',
+        duration: Snackbar.LENGTH_SHORT,
+        marginBottom: 10,
+      });
       return;
     }
 
     if (!validateEmail(email.trim())) {
-      Alert.alert('Validation Error', 'Please enter a valid email address');
+      // Alert.alert('Validation Error', 'Please enter a valid email address');
+      Snackbar.show({
+        text: 'Please enter a valid email address',
+        duration: Snackbar.LENGTH_SHORT,
+        marginBottom: 10,
+      });
       return;
     }
 
@@ -69,23 +96,26 @@ function LoginScreen() {
         `${BASE_URL}/auth/login`,
         {
           email: email.trim(),
-          password: password
+          password: password,
         },
         {
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
           },
-          timeout: 10000 // 10 seconds timeout
-        }
+          timeout: 10000, // 10 seconds timeout
+        },
       );
 
       console.log('Login Response:', JSON.stringify(response.data, null, 2));
 
       // More robust response checking
-      if (response.data && 
-          (response.data.status === "success" || response.data.token)) {
+      if (
+        response.data &&
+        (response.data.status === 'success' || response.data.token)
+      ) {
         const token = response.data.data?.token || response.data.token;
-        const refreshToken = response.data.data?.refreshToken || response.data.refreshToken;
+        const refreshToken =
+          response.data.data?.refreshToken || response.data.refreshToken;
 
         if (!token) {
           throw new Error('No authentication token received');
@@ -96,62 +126,86 @@ function LoginScreen() {
           ['userEmail', email],
           ['token', token],
           ['refreshToken', refreshToken || ''],
-          ['keepSignedIn', keepSignedIn ? 'true' : 'false']
+          ['keepSignedIn', keepSignedIn ? 'true' : 'false'],
         ]);
 
         // Ensure sign in context is updated
-        await signIn({ token, refreshToken });
+        await signIn({token, refreshToken});
 
         // Reset loading state before navigation
         setLoading(false);
 
         // Navigate to Home screen
-        navigation.replace("Home")
+        navigation.replace('Home');
       } else {
         // Handle unexpected response structure
+        setLoading(false);
         throw new Error('Invalid login response');
       }
     } catch (error) {
       // Reset loading state
       setLoading(false);
 
+      const errorMessage =
+        error.response.data.message ||
+        error.response.data.error ||
+        'Login failed. Please try again.';
+      // Alert.alert('Login Error', errorMessage);
+      Snackbar.show({
+        text: errorMessage,
+        duration: Snackbar.LENGTH_SHORT,
+        marginBottom: 10,
+      });
       // Comprehensive error handling
-      if (axios.isAxiosError(error)) {
-        if (error.response) {
-          // Server responded with an error
-          console.error('Login error response:', error.response.data);
-          const errorMessage = error.response.data.message || 
-                               error.response.data.error || 
-                               'Login failed. Please try again.';
-          Alert.alert('Login Error', errorMessage);
-        } else if (error.request) {
-          // Request made but no response received
-          console.error('No response received:', error.request);
-          Alert.alert('Network Error', 'Unable to connect to the server. Please check your internet connection.');
-        } else {
-          // Something else went wrong
-          console.error('Login error:', error.message);
-          Alert.alert('Error', error.message || 'An unexpected error occurred. Please try again.');
-        }
-      } else {
-        // Non-axios error
-        console.error('Unexpected login error:', error);
-        Alert.alert('Error', 'An unexpected error occurred. Please try again.');
-      }
+      // if (axios.isAxiosError(error)) {
+      //   if (error.response) {
+      //     // Server responded with an error
+      //     // console.error('Login error response:', error.response.data);
+      //     const errorMessage =
+      //       error.response.data.message ||
+      //       error.response.data.error ||
+      //       'Login failed. Please try again.';
+      //     // Alert.alert('Login Error', errorMessage);
+      //     ToastAndroid.show(errorMessage, ToastAndroid.BOTTOM);
+      //   } else if (error.request) {
+      //     // Request made but no response received
+      //     console.error('No response received:', error.request);
+      //     Alert.alert(
+      //       'Network Error',
+      //       'Unable to connect to the server. Please check your internet connection.',
+      //     );
+      //   } else {
+      //     // Something else went wrong
+      //     console.error('Login error:', error.message);
+      //     Alert.alert(
+      //       'Error',
+      //       error.message || 'An unexpected error occurred. Please try again.',
+      //     );
+      //   }
+      // } else {
+      //   // Non-axios error
+      //   console.error('Unexpected login error:', error);
+      //   Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      // }
     }
   };
 
+  useEffect(() => {
+    const isFormValid = validateEmail(email) && password;
+    setIsFormValid(isFormValid);
+  }, [email, password]);
+
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <StatusBar backgroundColor="#6B46C1" barStyle="light-content" />
       <BackgroundPattern />
-      
+
       <View style={styles.logoContainer}>
         <View style={styles.shadowCircle2}>
           <View style={styles.shadowCircle1}>
             <View style={styles.logoCircle}>
-              <Image 
-                source={require('../assets/images/Logo.png')} 
+              <Image
+                source={require('../assets/images/Logo.png')}
                 style={styles.logo}
                 resizeMode="contain"
               />
@@ -170,7 +224,7 @@ function LoginScreen() {
               style={styles.input}
               placeholder="Email Address"
               value={email}
-              onChangeText={(text) => {
+              onChangeText={text => {
                 setEmail(text);
               }}
               keyboardType="email-address"
@@ -185,20 +239,23 @@ function LoginScreen() {
               style={styles.input}
               placeholder="Password"
               value={password}
-              onChangeText={(text) => {
+              onChangeText={text => {
                 setPassword(text);
               }}
               secureTextEntry={!showPassword}
               placeholderTextColor="#A0AEC0"
               editable={!loading}
             />
-            <TouchableOpacity 
-              style={styles.eyeIcon} 
+            <TouchableOpacity
+              style={styles.eyeIcon}
               onPress={togglePasswordVisibility}
-              disabled={loading}
-            >
-              <Image 
-                source={showPassword ? require('../assets/images/Eye.png') : require('../assets/images/EyeOff.png')} 
+              disabled={loading}>
+              <Image
+                source={
+                  showPassword
+                    ? require('../assets/images/Eye.png')
+                    : require('../assets/images/EyeOff.png')
+                }
                 style={styles.eyeIconImage}
                 resizeMode="contain"
               />
@@ -206,14 +263,17 @@ function LoginScreen() {
           </View>
 
           <View style={styles.optionsContainer}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.checkboxContainer}
               onPress={() => setKeepSignedIn(!keepSignedIn)}
-              disabled={loading}
-            >
-              <View style={[styles.checkbox, keepSignedIn && styles.checkboxChecked]}>
+              disabled={loading}>
+              <View
+                style={[
+                  styles.checkbox,
+                  keepSignedIn && styles.checkboxChecked,
+                ]}>
                 {keepSignedIn && (
-                  <Image 
+                  <Image
                     source={require('../assets/images/Check.png')}
                     style={styles.checkmark}
                     resizeMode="contain"
@@ -222,19 +282,20 @@ function LoginScreen() {
               </View>
               <Text style={styles.checkboxLabel}>Keep me signed in</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => navigation.navigate('ForgotPassword')}
-              disabled={loading}
-            >
+              disabled={loading}>
               <Text style={styles.forgotPassword}>Forgot Password?</Text>
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity 
-            style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+          <TouchableOpacity
+            style={[
+              styles.loginButton,
+              (loading || !isFormValid) && styles.loginButtonDisabled,
+            ]}
             onPress={handleLogin}
-            disabled={loading}
-          >
+            disabled={loading || !isFormValid}>
             {loading ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
@@ -250,24 +311,24 @@ function LoginScreen() {
 
           <View style={styles.socialContainer}>
             <TouchableOpacity style={styles.socialButton} disabled={loading}>
-              <Image 
-                source={require("../assets/images/Apple.png")} 
+              <Image
+                source={require('../assets/images/Apple.png')}
                 style={styles.socialLogo}
                 resizeMode="contain"
               />
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.socialButton} disabled={loading}>
-              <Image 
-                source={require("../assets/images/Google.png")} 
+              <Image
+                source={require('../assets/images/Google.png')}
                 style={styles.socialLogo}
                 resizeMode="contain"
               />
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.socialButton} disabled={loading}>
-              <Image 
-                source={require("../assets/images/Facebook.png")} 
+              <Image
+                source={require('../assets/images/Facebook.png')}
                 style={styles.socialLogo}
                 resizeMode="contain"
               />
@@ -276,16 +337,15 @@ function LoginScreen() {
 
           <View style={styles.signupContainer}>
             <Text style={styles.signupText}>Do not have an account? </Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => navigation.navigate('CreateAccount')}
-              disabled={loading}
-            >
+              disabled={loading}>
               <Text style={styles.signupLink}>Sign Up</Text>
             </TouchableOpacity>
           </View>
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -305,7 +365,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '200%',
     height: 300,
-    transform: [{ rotate: '-35deg' }],
+    transform: [{rotate: '-35deg'}],
     left: '-50%',
   },
   logoContainer: {
@@ -467,10 +527,10 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#5A5C5E',
   },
   dividerText: {
-    color: '#718096',
+    color: '#000000',
     paddingHorizontal: 16,
     fontSize: 14,
   },
@@ -484,16 +544,10 @@ const styles = StyleSheet.create({
   socialButton: {
     width: 48,
     height: 48,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F9F5FF',
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },

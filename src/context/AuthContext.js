@@ -1,11 +1,11 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, {createContext, useState, useContext, useEffect} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
 const BASE_URL = 'https://13.49.68.11:3000';
 const AuthContext = createContext();
 
-export const AuthProvider = ({ children }) => {
+export const AuthProvider = ({children}) => {
   const [isLoading, setIsLoading] = useState(true);
   const [userToken, setUserToken] = useState(null);
 
@@ -13,29 +13,31 @@ export const AuthProvider = ({ children }) => {
   const api = axios.create({
     baseURL: BASE_URL,
     headers: {
-      'Content-Type': 'application/json'
-    }
+      'Content-Type': 'application/json',
+    },
   });
 
   // Add request interceptor to add token
   api.interceptors.request.use(
-    async (config) => {
+    async config => {
       const token = await AsyncStorage.getItem('accessToken');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
       return config;
     },
-    (error) => {
+    error => {
       return Promise.reject(error);
-    }
+    },
   );
 
   // Add response interceptor to handle token refresh
   api.interceptors.response.use(
-    (response) => response,
-    async (error) => {
+    response => response,
+    async error => {
       const originalRequest = error.config;
+
+      console.log('error.vond', error);
 
       // If error is 401 and we haven't tried to refresh token yet
       if (error.response?.status === 401 && !originalRequest._retry) {
@@ -46,22 +48,32 @@ export const AuthProvider = ({ children }) => {
           if (!refreshToken) throw new Error('No refresh token available');
 
           const response = await axios.post(`${BASE_URL}/auth/refresh-token`, {
-            refresh_token: refreshToken
+            refresh_token: refreshToken,
           });
 
           if (response.data && response.data.access_token) {
             // Store new tokens
-            await AsyncStorage.setItem('accessToken', response.data.access_token);
+            await AsyncStorage.setItem(
+              'accessToken',
+              response.data.access_token,
+            );
             if (response.data.refresh_token) {
-              await AsyncStorage.setItem('refreshToken', response.data.refresh_token);
+              await AsyncStorage.setItem(
+                'refreshToken',
+                response.data.refresh_token,
+              );
             }
 
             // Update userToken state
             setUserToken(response.data.access_token);
 
             // Update authorization header
-            api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
-            originalRequest.headers['Authorization'] = `Bearer ${response.data.access_token}`;
+            api.defaults.headers.common[
+              'Authorization'
+            ] = `Bearer ${response.data.access_token}`;
+            originalRequest.headers[
+              'Authorization'
+            ] = `Bearer ${response.data.access_token}`;
 
             // Retry original request
             return api(originalRequest);
@@ -73,7 +85,7 @@ export const AuthProvider = ({ children }) => {
         }
       }
       return Promise.reject(error);
-    }
+    },
   );
 
   useEffect(() => {
@@ -84,20 +96,26 @@ export const AuthProvider = ({ children }) => {
     try {
       const [accessToken, refreshToken] = await Promise.all([
         AsyncStorage.getItem('accessToken'),
-        AsyncStorage.getItem('refreshToken')
+        AsyncStorage.getItem('refreshToken'),
       ]);
 
       if (!accessToken && refreshToken) {
         // Try to refresh the token
         try {
           const response = await axios.post(`${BASE_URL}/auth/refresh-token`, {
-            refresh_token: refreshToken
+            refresh_token: refreshToken,
           });
 
           if (response.data && response.data.access_token) {
-            await AsyncStorage.setItem('accessToken', response.data.access_token);
+            await AsyncStorage.setItem(
+              'accessToken',
+              response.data.access_token,
+            );
             if (response.data.refresh_token) {
-              await AsyncStorage.setItem('refreshToken', response.data.refresh_token);
+              await AsyncStorage.setItem(
+                'refreshToken',
+                response.data.refresh_token,
+              );
             }
             setUserToken(response.data.access_token);
           }
@@ -115,20 +133,22 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const signIn = async (response) => {
+  const signIn = async response => {
     try {
-      console.log("sign in Tidycasass",{response})
- 
-      console.log("getting token");
-      const responseDummy =  {
-        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxMywiZW1haWwiOiJrYXJ0aGlrdGVzdEBnbWFpbC5jb20iLCJ1c2VybmFtZSI6ImthcnRoaWt0ZXN0IiwiaWF0IjoxNzM5NTEyODQ1LCJleHAiOjE3Mzk1OTkyNDV9.8zMBD9wjDdsZAX92tyTF0aJ4MB-AhbcFp_YANZ7J2Yw",
-        "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxMywiZW1haWwiOiJrYXJ0aGlrdGVzdEBnbWFpbC5jb20iLCJ1c2VybmFtZSI6ImthcnRoaWt0ZXN0IiwiaWF0IjoxNzM5NTEyODQ1LCJleHAiOjE3NDIxMDQ4NDV9.A9zIFIoxmmsFYdvIjT0-n_HJqbA1POirZ7P8PQHBHG0"
-    }
+      console.log('sign in Tidycasass', {response});
+
+      console.log('getting token');
+      const responseDummy = {
+        token:
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxMywiZW1haWwiOiJrYXJ0aGlrdGVzdEBnbWFpbC5jb20iLCJ1c2VybmFtZSI6ImthcnRoaWt0ZXN0IiwiaWF0IjoxNzM5NTEyODQ1LCJleHAiOjE3Mzk1OTkyNDV9.8zMBD9wjDdsZAX92tyTF0aJ4MB-AhbcFp_YANZ7J2Yw',
+        refreshToken:
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxMywiZW1haWwiOiJrYXJ0aGlrdGVzdEBnbWFpbC5jb20iLCJ1c2VybmFtZSI6ImthcnRoaWt0ZXN0IiwiaWF0IjoxNzM5NTEyODQ1LCJleHAiOjE3NDIxMDQ4NDV9.A9zIFIoxmmsFYdvIjT0-n_HJqbA1POirZ7P8PQHBHG0',
+      };
 
       // Get tokens from response data
       const token = response.token;
       const refreshToken = response.refreshToken;
-      console.log({token,refreshToken})
+      console.log({token, refreshToken});
 
       if (!token) {
         throw new Error('No token in response');
@@ -139,7 +159,7 @@ export const AuthProvider = ({ children }) => {
       if (refreshToken) {
         await AsyncStorage.setItem('refreshToken', refreshToken);
       }
-      console.log("AftADding token to Api.defaults")      // Set default auth header
+      console.log('AftADding token to Api.defaults'); // Set default auth header
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUserToken(token);
     } catch (error) {
@@ -155,9 +175,9 @@ export const AuthProvider = ({ children }) => {
         AsyncStorage.removeItem('accessToken'),
         AsyncStorage.removeItem('refreshToken'),
         AsyncStorage.removeItem('userEmail'),
-        AsyncStorage.removeItem('keepSignedIn')
+        AsyncStorage.removeItem('keepSignedIn'),
       ]);
-      
+
       // Clear auth header
       delete api.defaults.headers.common['Authorization'];
       setUserToken(null);
@@ -168,13 +188,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{
-      isLoading,
-      userToken,
-      signIn,
-      signOut,
-      api
-    }}>
+    <AuthContext.Provider
+      value={{
+        isLoading,
+        userToken,
+        signIn,
+        signOut,
+        api,
+      }}>
       {children}
     </AuthContext.Provider>
   );

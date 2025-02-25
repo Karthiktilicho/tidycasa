@@ -1,5 +1,13 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, Image, StatusBar } from 'react-native';
+import React, {useState} from 'react';
+import {
+  Image,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
 const BackgroundPattern = () => (
@@ -14,24 +22,24 @@ const BackgroundPattern = () => (
       colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
       start={{x: 0, y: 0}}
       end={{x: 1, y: 1}}
-      style={[styles.diagonalStripe, { top: '30%' }]}
+      style={[styles.diagonalStripe, {top: '30%'}]}
     />
   </View>
 );
 
-const NewPasswordScreen = ({ navigation }) => {
+const NewPasswordScreen = ({navigation}) => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [newPasswordError, setNewPasswordError] = useState('');
   const [confirmPasswordError, setConfirmPasswordError] = useState('');
 
-  const validatePassword = (password) => {
+  const validatePassword = password => {
     return password.length >= 6;
   };
 
   const handleSubmit = () => {
     let isValid = true;
-    
+
     // Reset errors
     setNewPasswordError('');
     setConfirmPasswordError('');
@@ -56,7 +64,8 @@ const NewPasswordScreen = ({ navigation }) => {
 
     if (isValid) {
       // Proceed to login
-      navigation.navigate('LoginScreen');
+      navigation.popToTop();
+      navigation.navigate('Login');
     }
   };
 
@@ -64,14 +73,14 @@ const NewPasswordScreen = ({ navigation }) => {
     <View style={styles.container}>
       <StatusBar backgroundColor="#6B46C1" barStyle="light-content" />
       <BackgroundPattern />
-      
+
       <View style={styles.cardContainer}>
         <View style={styles.logoContainer}>
           <View style={styles.shadowCircle2}>
             <View style={styles.shadowCircle1}>
               <View style={styles.logoCircle}>
-                <Image 
-                  source={require('../assets/images/Logo.png')} 
+                <Image
+                  source={require('../assets/images/Logo.png')}
                   style={styles.logo}
                   resizeMode="contain"
                 />
@@ -82,11 +91,10 @@ const NewPasswordScreen = ({ navigation }) => {
 
         <View style={styles.contentContainer}>
           <View style={styles.headerContainer}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.backButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Image 
+              onPress={() => navigation.goBack()}>
+              <Image
                 source={require('../assets/images/arrow_back.png')}
                 style={styles.backIcon}
                 resizeMode="contain"
@@ -101,14 +109,16 @@ const NewPasswordScreen = ({ navigation }) => {
             <TextInput
               style={[styles.input, newPasswordError && styles.inputError]}
               value={newPassword}
-              onChangeText={(text) => {
+              onChangeText={text => {
                 setNewPassword(text);
                 setNewPasswordError('');
               }}
               secureTextEntry
               placeholder=""
             />
-            {newPasswordError ? <Text style={styles.errorText}>{newPasswordError}</Text> : null}
+            {newPasswordError ? (
+              <Text style={styles.errorText}>{newPasswordError}</Text>
+            ) : null}
           </View>
 
           <View style={styles.inputContainer}>
@@ -116,20 +126,19 @@ const NewPasswordScreen = ({ navigation }) => {
             <TextInput
               style={[styles.input, confirmPasswordError && styles.inputError]}
               value={confirmPassword}
-              onChangeText={(text) => {
+              onChangeText={text => {
                 setConfirmPassword(text);
                 setConfirmPasswordError('');
               }}
               secureTextEntry
               placeholder=""
             />
-            {confirmPasswordError ? <Text style={styles.errorText}>{confirmPasswordError}</Text> : null}
+            {confirmPasswordError ? (
+              <Text style={styles.errorText}>{confirmPasswordError}</Text>
+            ) : null}
           </View>
 
-          <TouchableOpacity 
-            style={styles.button}
-            onPress={handleSubmit}
-          >
+          <TouchableOpacity style={styles.button} onPress={handleSubmit}>
             <Text style={styles.buttonText}>Submit</Text>
           </TouchableOpacity>
         </View>
@@ -155,7 +164,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '200%',
     height: 300,
-    transform: [{ rotate: '-35deg' }],
+    transform: [{rotate: '-35deg'}],
     left: '-50%',
   },
   cardContainer: {

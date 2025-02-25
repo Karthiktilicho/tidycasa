@@ -1,37 +1,35 @@
-import React from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import {View, ActivityIndicator} from 'react-native';
-import {AuthProvider, useAuth} from './src/context/AuthContext';
-import {AppProvider} from './src/context/AppContext';
-import {StatusBar, useColorScheme} from 'react-native';
+import React from 'react';
+import {ActivityIndicator, StatusBar, useColorScheme, View} from 'react-native';
 import {enableScreens} from 'react-native-screens';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {AppProvider} from './src/context/AppContext';
+import {AuthProvider, useAuth} from './src/context/AuthContext';
 
 // Enable react-native-screens
 enableScreens();
 
 // Import screens
-import OnboardingScreen from './src/screens/OnboardingScreen';
-import LoginScreen from './src/screens/LoginScreen';
-import CreateAccountScreen from './src/screens/CreateAccountScreen';
-import CreateAccountDetailsScreen from './src/screens/CreateAccountDetailsScreen';
-import HomeScreen from './src/screens/HomeScreen';
-import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
-import VerifyScreen from './src/screens/verify';
-import ProductUploadScreen from './src/screens/ProductUploadScreen';
-import CollectionsScreen from './src/screens/CollectionsScreen';
-import ProfileScreen from './src/screens/ProfileScreen';
-import SpaceScreen from './src/screens/SpaceScreen';
-import EditProfileScreen from './src/screens/EditProfileScreen';
-import NewPasswordScreen from './src/screens/NewPasswordScreen';
-import SpaceDetailsScreen from './src/screens/SpaceDetailsScreen';
 import ChangePasswordScreen from './src/screens/ChangePasswordScreen';
-import SpacesScreen from './src/screens/SpacesScreen';
-import IndividualSpaceScreen from './src/screens/IndividualSpaceScreen';
-import ProductDetailsScreen from './src/screens/SingleProductScreen';
+import CollectionsScreen from './src/screens/CollectionsScreen';
+import CreateAccountDetailsScreen from './src/screens/CreateAccountDetailsScreen';
+import CreateAccountScreen from './src/screens/CreateAccountScreen';
+import EditProfileScreen from './src/screens/EditProfileScreen';
+import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
+import HomeScreen from './src/screens/HomeScreen';
 import IndividualCollectionScreen from './src/screens/IndividualCollectionScreen';
+import IndividualSpaceScreen from './src/screens/IndividualSpaceScreen';
+import LoginScreen from './src/screens/LoginScreen';
+import NewPasswordScreen from './src/screens/NewPasswordScreen';
+import OnboardingScreen from './src/screens/OnboardingScreen';
 import OnlineProductSearchScreen from './src/screens/OnlineProductSearchScreen';
+import ProductUploadScreen from './src/screens/ProductUploadScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
+import ProductDetailsScreen from './src/screens/SingleProductScreen';
+import SpaceDetailsScreen from './src/screens/SpaceDetailsScreen';
+import SpaceScreen from './src/screens/SpaceScreen';
+import SpacesScreen from './src/screens/SpacesScreen';
+import VerifyScreen from './src/screens/verify';
 
 const Stack = createNativeStackNavigator();
 
@@ -66,6 +64,11 @@ const AuthStack = () => (
     <Stack.Screen
       name="Verify"
       component={VerifyScreen}
+      options={{headerShown: false}}
+    />
+    <Stack.Screen
+      name="NewPassword"
+      component={NewPasswordScreen}
       options={{headerShown: false}}
     />
   </>
@@ -113,11 +116,6 @@ const AppStack = () => (
     <Stack.Screen
       name="EditProfile"
       component={EditProfileScreen}
-      options={{headerShown: false}}
-    />
-    <Stack.Screen
-      name="NewPassword"
-      component={NewPasswordScreen}
       options={{headerShown: false}}
     />
     <Stack.Screen

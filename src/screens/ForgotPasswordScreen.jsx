@@ -1,5 +1,13 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, Image, StatusBar } from 'react-native';
+import React, {useState} from 'react';
+import {
+  Image,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
 const BackgroundPattern = () => (
@@ -14,16 +22,16 @@ const BackgroundPattern = () => (
       colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
       start={{x: 0, y: 0}}
       end={{x: 1, y: 1}}
-      style={[styles.diagonalStripe, { top: '30%' }]}
+      style={[styles.diagonalStripe, {top: '30%'}]}
     />
   </View>
 );
 
-function ForgotPasswordScreen({ navigation }) {
+function ForgotPasswordScreen({navigation}) {
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState('');
 
-  const validateEmail = (email) => {
+  const validateEmail = email => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
@@ -50,14 +58,14 @@ function ForgotPasswordScreen({ navigation }) {
     <View style={styles.container}>
       <StatusBar backgroundColor="#6B46C1" barStyle="light-content" />
       <BackgroundPattern />
-      
+
       <View style={styles.cardContainer}>
         <View style={styles.logoContainer}>
           <View style={styles.shadowCircle2}>
             <View style={styles.shadowCircle1}>
               <View style={styles.logoCircle}>
-                <Image 
-                  source={require('../assets/images/Logo.png')} 
+                <Image
+                  source={require('../assets/images/Logo.png')}
                   style={styles.logo}
                   resizeMode="contain"
                 />
@@ -68,11 +76,10 @@ function ForgotPasswordScreen({ navigation }) {
 
         <View style={styles.contentContainer}>
           <View style={styles.headerContainer}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.backButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Image 
+              onPress={() => navigation.goBack()}>
+              <Image
                 source={require('../assets/images/arrow_back.png')}
                 style={styles.backIcon}
                 resizeMode="contain"
@@ -87,7 +94,7 @@ function ForgotPasswordScreen({ navigation }) {
               style={[styles.input, emailError && styles.inputError]}
               placeholder="Email Address"
               value={email}
-              onChangeText={(text) => {
+              onChangeText={text => {
                 setEmail(text);
                 setEmailError('');
               }}
@@ -95,20 +102,18 @@ function ForgotPasswordScreen({ navigation }) {
               autoCapitalize="none"
               placeholderTextColor="#A0AEC0"
             />
-            {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+            {emailError ? (
+              <Text style={styles.errorText}>{emailError}</Text>
+            ) : null}
           </View>
 
-          <TouchableOpacity 
-            style={styles.button}
-            onPress={handleVerify}
-          >
+          <TouchableOpacity style={styles.button} onPress={handleVerify}>
             <Text style={styles.buttonText}>Verify</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.backToSignIn}
-            onPress={() => navigation.navigate('LoginScreen')}
-          >
+            onPress={() => navigation.goBack()}>
             <Text style={styles.backToSignInText}>Back to sign in</Text>
           </TouchableOpacity>
         </View>
@@ -134,7 +139,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '200%',
     height: 300,
-    transform: [{ rotate: '-35deg' }],
+    transform: [{rotate: '-35deg'}],
     left: '-50%',
   },
   cardContainer: {
