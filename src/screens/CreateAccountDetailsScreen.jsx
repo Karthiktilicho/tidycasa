@@ -1,18 +1,20 @@
-import React, { useState } from 'react';
-import { 
-  StyleSheet, 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StatusBar, 
-  Image,
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import React, {useEffect, useState} from 'react';
+import {
   ActivityIndicator,
-  Alert 
+  Alert,
+  Image,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import Snackbar from 'react-native-snackbar';
 
 const api = axios.create({
   baseURL: 'http://192.168.0.194:3000',
@@ -33,12 +35,12 @@ const BackgroundPattern = () => (
       colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
       start={{x: 0, y: 0}}
       end={{x: 1, y: 1}}
-      style={[styles.diagonalStripe, { top: '30%' }]}
+      style={[styles.diagonalStripe, {top: '30%'}]}
     />
   </View>
 );
 
-function CreateAccountDetailsScreen({ navigation }) {
+function CreateAccountDetailsScreen({navigation}) {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -47,10 +49,21 @@ function CreateAccountDetailsScreen({ navigation }) {
   const [usernameError, setUsernameError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [isFormValid, setIsFormValid] = useState(false);
+
+  const validateEmail = email => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  useEffect(() => {
+    // const isFormValid =
+    setIsFormValid(validateEmail(email) && password && username);
+  }, [email, password, username]);
 
   const validateInputs = () => {
     let isValid = true;
-    
+
     // Reset errors
     setUsernameError('');
     setEmailError('');
@@ -84,17 +97,26 @@ function CreateAccountDetailsScreen({ navigation }) {
   };
 
   const handleCreateAccount = async () => {
-    if (!validateInputs()) return;
+    if (!validateInputs()) {
+      return;
+    }
 
     setLoading(true);
     try {
-      console.log('Sending registration request with:', { username, email, password });
-      
-      const response = await axios.post('http://13.49.68.11:3000/auth/register', {
+      console.log('Sending registration request with:', {
         username,
         email,
-        password
+        password,
       });
+
+      const response = await axios.post(
+        'http://13.49.68.11:3000/auth/register',
+        {
+          username,
+          email,
+          password,
+        },
+      );
 
       console.log('Registration response:', response.data);
 
@@ -104,45 +126,47 @@ function CreateAccountDetailsScreen({ navigation }) {
         await AsyncStorage.setItem('userName', userData.username || username);
         await AsyncStorage.setItem('userEmail', userData.email || email);
         await AsyncStorage.setItem('userPhone', userData.phone || '');
-        
-        Alert.alert(
-          'Success',
-          'Account created successfully!',
-          [
-            {
-              text: 'OK',
-              onPress: () => navigation.navigate('LoginScreen')
-            }
-          ]
-        );
+
+        // Alert.alert('Success', 'Account created successfully!', [
+        //   {
+        //     text: 'OK',
+        //     onPress: () => navigation.navigate('LoginScreen'),
+        //   },
+        // ]);
+
+        Snackbar.show({
+          text: 'Account created successfully!',
+          duration: Snackbar.LENGTH_SHORT,
+          marginBottom: 10,
+          backgroundColor: 'green',
+        });
+        navigation.navigate('LoginScreen');
       }
     } catch (error) {
-      console.error('Registration error:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
+      Snackbar.show({
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          'An error occurred during registration',
+        duration: Snackbar.LENGTH_SHORT,
+        marginBottom: 10,
       });
-
-      Alert.alert(
-        'Registration Failed',
-        error.response?.data?.message || error.message || 'An error occurred during registration'
-      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <StatusBar backgroundColor="#6B46C1" barStyle="light-content" />
       <BackgroundPattern />
-      
+
       <View style={styles.logoContainer}>
         <View style={styles.shadowCircle2}>
           <View style={styles.shadowCircle1}>
             <View style={styles.logoCircle}>
-              <Image 
-                source={require('../assets/images/Logo.png')} 
+              <Image
+                source={require('../assets/images/Logo.png')}
                 style={styles.logo}
                 resizeMode="contain"
               />
@@ -160,7 +184,7 @@ function CreateAccountDetailsScreen({ navigation }) {
             <TextInput
               style={[styles.input, usernameError && styles.inputError]}
               value={username}
-              onChangeText={(text) => {
+              onChangeText={text => {
                 setUsername(text);
                 setUsernameError('');
               }}
@@ -169,14 +193,16 @@ function CreateAccountDetailsScreen({ navigation }) {
               autoCapitalize="none"
               editable={!loading}
             />
-            {usernameError ? <Text style={styles.errorText}>{usernameError}</Text> : null}
+            {usernameError ? (
+              <Text style={styles.errorText}>{usernameError}</Text>
+            ) : null}
           </View>
 
           <View style={styles.inputContainer}>
             <TextInput
               style={[styles.input, emailError && styles.inputError]}
               value={email}
-              onChangeText={(text) => {
+              onChangeText={text => {
                 setEmail(text);
                 setEmailError('');
               }}
@@ -186,15 +212,21 @@ function CreateAccountDetailsScreen({ navigation }) {
               placeholderTextColor="#A0AEC0"
               editable={!loading}
             />
-            {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+            {emailError ? (
+              <Text style={styles.errorText}>{emailError}</Text>
+            ) : null}
           </View>
 
           <View style={styles.inputContainer}>
-            <View style={[styles.passwordContainer, passwordError && styles.inputError]}>
+            <View
+              style={[
+                styles.passwordContainer,
+                passwordError && styles.inputError,
+              ]}>
               <TextInput
                 style={styles.passwordInput}
                 value={password}
-                onChangeText={(text) => {
+                onChangeText={text => {
                   setPassword(text);
                   setPasswordError('');
                 }}
@@ -203,26 +235,33 @@ function CreateAccountDetailsScreen({ navigation }) {
                 placeholderTextColor="#A0AEC0"
                 editable={!loading}
               />
-              <TouchableOpacity 
-                style={styles.eyeIcon} 
+              <TouchableOpacity
+                style={styles.eyeIcon}
                 onPress={() => setShowPassword(!showPassword)}
-                disabled={loading}
-              >
-                <Image 
-                  source={showPassword ? require('../assets/images/Eye.png') : require('../assets/images/EyeOff.png')} 
+                disabled={loading}>
+                <Image
+                  source={
+                    showPassword
+                      ? require('../assets/images/Eye.png')
+                      : require('../assets/images/EyeOff.png')
+                  }
                   style={styles.eyeIconImage}
                   resizeMode="contain"
                 />
               </TouchableOpacity>
             </View>
-            {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+            {passwordError ? (
+              <Text style={styles.errorText}>{passwordError}</Text>
+            ) : null}
           </View>
 
-          <TouchableOpacity 
-            style={[styles.button, loading && styles.buttonDisabled]}
+          <TouchableOpacity
+            style={[
+              styles.button,
+              (loading || !isFormValid) && styles.buttonDisabled,
+            ]}
             onPress={handleCreateAccount}
-            disabled={loading}
-          >
+            disabled={loading || !isFormValid}>
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
@@ -238,7 +277,7 @@ function CreateAccountDetailsScreen({ navigation }) {
           </View>
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -259,7 +298,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '200%',
     height: 300,
-    transform: [{ rotate: '-35deg' }],
+    transform: [{rotate: '-35deg'}],
     left: '-50%',
   },
   logoContainer: {
@@ -308,20 +347,20 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingHorizontal: 20,
-    alignItems: 'flex-start',
+    alignItems: 'flex-center',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#6B46C1',
     marginBottom: 8,
-    textAlign: 'left',
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
     color: '#718096',
     marginBottom: 30,
-    textAlign: 'left',
+    textAlign: 'center',
   },
   inputContainer: {
     width: '100%',

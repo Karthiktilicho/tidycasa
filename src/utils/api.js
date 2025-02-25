@@ -18,11 +18,11 @@ const refreshAccessToken = async () => {
   try {
     const refreshToken = await AsyncStorage.getItem('refreshToken');
     if (!refreshToken) {
-      throw new Error('No refresh token found');
+      // throw new Error('No refresh token found');
     }
 
     const response = await axios.post(`${BASE_URL}/auth/refresh-token`, {
-      refresh_token: refreshToken
+      refresh_token: refreshToken,
     });
 
     if (response.data && response.data.access_token) {
@@ -43,7 +43,7 @@ const refreshAccessToken = async () => {
 const getAuthHeaders = async () => {
   try {
     let accessToken = await AsyncStorage.getItem('accessToken');
-    
+
     if (!accessToken) {
       // Try to refresh the token if no access token is found
       try {
@@ -54,25 +54,25 @@ const getAuthHeaders = async () => {
       }
     }
 
-    logEvent('AUTH_HEADERS', { 
+    logEvent('AUTH_HEADERS', {
       tokenStatus: accessToken ? 'Token exists' : 'No token found',
-      tokenLength: accessToken ? accessToken.length : 0
+      tokenLength: accessToken ? accessToken.length : 0,
     });
-    
+
     if (!accessToken) {
       throw new Error('No access token found. Please log in again.');
     }
-    
+
     return {
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      }
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
     };
   } catch (error) {
-    logEvent('AUTH_HEADERS_ERROR', { 
+    logEvent('AUTH_HEADERS_ERROR', {
       errorMessage: error.message,
-      errorStack: error.stack
+      errorStack: error.stack,
     });
     console.error('Error getting auth headers:', error);
     throw error;
@@ -81,9 +81,11 @@ const getAuthHeaders = async () => {
 
 // Axios interceptor to handle token refresh
 axios.interceptors.response.use(
-  (response) => response,
-  async (error) => {
+  response => response,
+  async error => {
     const originalRequest = error.config;
+
+    console.log('firstdsfsd', error);
 
     // If the error is 401 and we haven't tried to refresh the token yet
     if (error.response?.status === 401 && !originalRequest._retry) {
@@ -92,10 +94,10 @@ axios.interceptors.response.use(
       try {
         // Try to refresh the token
         const newAccessToken = await refreshAccessToken();
-        
+
         // Update the failed request with the new token
         originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
-        
+
         // Retry the original request
         return axios(originalRequest);
       } catch (refreshError) {
@@ -105,7 +107,7 @@ axios.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 const handleApiError = (error, context) => {
@@ -119,14 +121,14 @@ const handleApiError = (error, context) => {
     requestConfig: {
       method: error.config?.method,
       url: error.config?.url,
-      data: error.config?.data
-    }
+      data: error.config?.data,
+    },
   });
 
   console.error(`API Error in ${context}:`, {
     message: error.message,
     response: error.response?.data,
-    status: error.response?.status
+    status: error.response?.status,
   });
 
   if (error.response) {
@@ -139,31 +141,35 @@ const handleApiError = (error, context) => {
       // Bad request, likely validation error
       throw new Error(error.response.data.message || 'Invalid data submitted');
     } else {
-      throw new Error(error.response.data.message || 'An unexpected error occurred');
+      throw new Error(
+        error.response.data.message || 'An unexpected error occurred',
+      );
     }
   } else if (error.request) {
     // The request was made but no response was received
-    throw new Error('No response received from server. Check your network connection.');
+    throw new Error(
+      'No response received from server. Check your network connection.',
+    );
   } else {
     // Something happened in setting up the request that triggered an Error
     throw new Error('Error setting up the request: ' + error.message);
   }
 };
 
-export const createSpace = async (spaceData) => {
+export const createSpace = async spaceData => {
   try {
     // Create the request body exactly as shown in Postman
     const formData = new FormData();
-    
+
     // These field names must match exactly what works in Postman
     formData.append('space_name', spaceData.name);
     formData.append('description', spaceData.description);
-    
+
     if (spaceData.image) {
       formData.append('space_image', {
         uri: spaceData.image.uri,
         name: spaceData.image.fileName,
-        type: 'image/jpeg'
+        type: 'image/jpeg',
       });
     }
 
@@ -172,14 +178,10 @@ export const createSpace = async (spaceData) => {
 
     console.log('Sending space creation request:', {
       url: `${BASE_URL}/spaces`,
-      formData: Object.fromEntries(formData._parts)
+      formData: Object.fromEntries(formData._parts),
     });
 
-    const response = await axios.post(
-      `${BASE_URL}/spaces`,
-      formData,
-      headers
-    );
+    const response = await axios.post(`${BASE_URL}/spaces`, formData, headers);
 
     console.log('Space creation response:', response.data);
 
@@ -188,24 +190,24 @@ export const createSpace = async (spaceData) => {
       name: response.data.space_name,
       description: response.data.description,
       image: response.data.space_image,
-      backendId: true
+      backendId: true,
     };
   } catch (error) {
     console.error('Space creation failed:', {
       error: error.message,
-      response: error.response?.data
+      response: error.response?.data,
     });
     throw error;
   }
 };
 
-export const createProduct = async (productData) => {
+export const createProduct = async productData => {
   try {
     console.log('Raw Product Data:', productData);
 
     // Create FormData object
     const formData = new FormData();
-    
+
     // Match exact field names from Postman
     formData.append('product_name', productData.name);
     formData.append('description', productData.description);
@@ -220,7 +222,7 @@ export const createProduct = async (productData) => {
       formData.append('image', {
         uri: image.uri,
         type: image.type || 'image/jpeg',
-        name: image.fileName || 'image.jpg'
+        name: image.fileName || 'image.jpg',
       });
     }
 
@@ -233,41 +235,45 @@ export const createProduct = async (productData) => {
     const config = {
       method: 'post',
       url: `${BASE_URL}/products`,
-      headers: { 
+      headers: {
         'Content-Type': 'multipart/form-data',
         // Add any auth headers if needed
       },
-      data: formData
+      data: formData,
     };
 
     console.log('Request config:', {
       url: config.url,
       headers: config.headers,
-      method: config.method
+      method: config.method,
     });
 
     const response = await axios(config);
     console.log('Upload response:', response.data);
-    
+
     return response.data;
   } catch (error) {
     console.error('Upload error details:', {
       message: error.message,
       response: error.response?.data,
-      status: error.response?.status
+      status: error.response?.status,
     });
     throw error;
   }
 };
 
-export const createCollection = async (collectionData) => {
+export const createCollection = async collectionData => {
   try {
-    logEvent('CREATE_COLLECTION_REQUEST', { collectionData });
+    logEvent('CREATE_COLLECTION_REQUEST', {collectionData});
     const headers = await getAuthHeaders();
-    const response = await axios.post(`${BASE_URL}/collections`, collectionData, headers);
-    logEvent('CREATE_COLLECTION_RESPONSE', { 
+    const response = await axios.post(
+      `${BASE_URL}/collections`,
+      collectionData,
+      headers,
+    );
+    logEvent('CREATE_COLLECTION_RESPONSE', {
       responseData: response.data,
-      status: response.status 
+      status: response.status,
     });
     return response.data;
   } catch (error) {
@@ -279,9 +285,9 @@ export const fetchSpaces = async () => {
   try {
     const headers = await getAuthHeaders();
     const response = await axios.get(`${BASE_URL}/spaces/user`, headers);
-    logEvent('FETCH_SPACES_RESPONSE', { 
+    logEvent('FETCH_SPACES_RESPONSE', {
       spacesCount: response.data.length,
-      status: response.status 
+      status: response.status,
     });
     return response.data;
   } catch (error) {
@@ -302,7 +308,7 @@ export const getUserProfile = async () => {
       phone: userPhone,
       collections_count: 0,
       spaces_count: 0,
-      products_count: 0
+      products_count: 0,
     };
   } catch (error) {
     console.error('Error fetching user profile:', error);

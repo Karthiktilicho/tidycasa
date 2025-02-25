@@ -1,5 +1,13 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Image, StatusBar } from 'react-native';
+import {
+  Image,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
 const BackgroundPattern = () => (
@@ -14,21 +22,20 @@ const BackgroundPattern = () => (
       colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
       start={{x: 0, y: 0}}
       end={{x: 1, y: 1}}
-      style={[styles.diagonalStripe, { top: '30%' }]}
+      style={[styles.diagonalStripe, {top: '30%'}]}
     />
   </View>
 );
 
-const CreateAccountScreen = ({ navigation }) => {
+const CreateAccountScreen = ({navigation}) => {
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <StatusBar backgroundColor="#6B46C1" barStyle="light-content" />
       <BackgroundPattern />
-      
-      <TouchableOpacity 
+
+      <TouchableOpacity
         style={styles.skipButton}
-        onPress={() => navigation.navigate('Home')}
-      >
+        onPress={() => navigation.navigate('Home')}>
         <Text style={styles.skipText}>Skip</Text>
       </TouchableOpacity>
 
@@ -37,8 +44,8 @@ const CreateAccountScreen = ({ navigation }) => {
           <View style={styles.shadowCircle2}>
             <View style={styles.shadowCircle1}>
               <View style={styles.logoCircle}>
-                <Image 
-                  source={require('../assets/images/Logo.png')} 
+                <Image
+                  source={require('../assets/images/Logo.png')}
                   style={styles.logo}
                   resizeMode="contain"
                 />
@@ -51,12 +58,11 @@ const CreateAccountScreen = ({ navigation }) => {
           <Text style={styles.title}>Create Account</Text>
           <Text style={styles.subtitle}>Get start with tidy casa</Text>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.button}
-            onPress={() => navigation.navigate('CreateAccountDetails')}
-          >
-            <Image 
-              source={require('../assets/images/User.png')} 
+            onPress={() => navigation.navigate('CreateAccountDetails')}>
+            <Image
+              source={require('../assets/images/User.png')}
               style={styles.buttonIcon}
               resizeMode="contain"
             />
@@ -64,8 +70,8 @@ const CreateAccountScreen = ({ navigation }) => {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.button}>
-            <Image 
-              source={require('../assets/images/Apple.png')} 
+            <Image
+              source={require('../assets/images/Apple.png')}
               style={styles.buttonIcon}
               resizeMode="contain"
             />
@@ -73,8 +79,8 @@ const CreateAccountScreen = ({ navigation }) => {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.button}>
-            <Image 
-              source={require('../assets/images/Google.png')} 
+            <Image
+              source={require('../assets/images/Google.png')}
               style={styles.buttonIcon}
               resizeMode="contain"
             />
@@ -82,8 +88,8 @@ const CreateAccountScreen = ({ navigation }) => {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.button}>
-            <Image 
-              source={require('../assets/images/Facebook.png')} 
+            <Image
+              source={require('../assets/images/Facebook.png')}
               style={styles.buttonIcon}
               resizeMode="contain"
             />
@@ -92,13 +98,14 @@ const CreateAccountScreen = ({ navigation }) => {
 
           <View style={styles.loginContainer}>
             <Text style={styles.loginText}>Already have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('LoginScreen')}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('LoginScreen')}>
               <Text style={styles.loginLink}>Login</Text>
             </TouchableOpacity>
           </View>
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 };
 
@@ -119,7 +126,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '200%',
     height: 300,
-    transform: [{ rotate: '-35deg' }],
+    transform: [{rotate: '-35deg'}],
     left: '-50%',
   },
   cardContainer: {
@@ -168,7 +175,8 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingHorizontal: 20,
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontSize: 24,
@@ -182,7 +190,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666666',
     width: '100%',
-    textAlign: 'left',
+    textAlign: 'center',
     marginBottom: 30,
   },
   button: {

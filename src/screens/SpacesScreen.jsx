@@ -1,21 +1,21 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  RefreshControl,
   Alert,
   Image,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBar from '../components/BottomNavBar';
 
 const BASE_URL = 'http://13.49.68.11:3000';
 
-const SpacesScreen = ({ navigation }) => {
+const SpacesScreen = ({navigation}) => {
   const [spaces, setSpaces] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -25,8 +25,6 @@ const SpacesScreen = ({ navigation }) => {
     try {
       setLoading(true);
       const token = await AsyncStorage.getItem('accessToken');
-      
-      console.log('Fetching spaces with token:', token);
 
       const response = await axios.get(`${BASE_URL}/spaces/user`, {
         headers: {
@@ -35,7 +33,10 @@ const SpacesScreen = ({ navigation }) => {
         },
       });
 
-      console.log('Raw Spaces Response:', JSON.stringify(response.data, null, 2));
+      console.log(
+        'Raw Spaces Response:',
+        JSON.stringify(response.data, null, 2),
+      );
 
       if (response.data && Array.isArray(response.data.data)) {
         const spacesData = response.data.data.map(space => ({
@@ -48,7 +49,7 @@ const SpacesScreen = ({ navigation }) => {
         }));
 
         const sortedSpaces = spacesData.sort(
-          (a, b) => new Date(b.created_at) - new Date(a.created_at)
+          (a, b) => new Date(b.created_at) - new Date(a.created_at),
         );
 
         console.log('Processed Spaces:', sortedSpaces);
@@ -63,11 +64,11 @@ const SpacesScreen = ({ navigation }) => {
         message: error.message,
         status: error.response?.status,
         data: error.response?.data,
-        config: error.config
+        config: error.config,
       });
       Alert.alert(
         'Error',
-        'Unable to fetch spaces. Please check your internet connection and try again.'
+        'Unable to fetch spaces. Please check your internet connection and try again.',
       );
       setSpaces([]);
       setLoading(false);
@@ -97,15 +98,14 @@ const SpacesScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <ScrollView 
+      <ScrollView
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
             colors={['#6B46C1']}
           />
-        }
-      >
+        }>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Spaces</Text>
         </View>
@@ -113,34 +113,40 @@ const SpacesScreen = ({ navigation }) => {
         {spaces.length === 0 ? (
           <View style={styles.emptyStateContainer}>
             <Text style={styles.emptyStateText}>No spaces found</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.createSpaceButton}
-              onPress={() => navigation.navigate('CreateSpace')}
-            >
-              <Text style={styles.createSpaceButtonText}>Create First Space</Text>
+              onPress={() => navigation.navigate('CreateSpace')}>
+              <Text style={styles.createSpaceButtonText}>
+                Create First Space
+              </Text>
             </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.spacesContainer}>
             {spaces.map(space => (
-              <TouchableOpacity 
-                key={space.id} 
+              <TouchableOpacity
+                key={space.id}
                 style={styles.spaceCard}
-                onPress={() => navigation.navigate('IndividualSpace', { 
-                  spaceId: space.id,
-                  spaceName: space.name 
-                })}
-              >
-                <Image 
-                  source={space.space_image ? { uri: space.space_image } : require('../assets/images/Space_default.jpg')}
-                  style={styles.spaceImage} 
+                onPress={() =>
+                  navigation.navigate('IndividualSpace', {
+                    spaceId: space.id,
+                    spaceName: space.name,
+                  })
+                }>
+                <Image
+                  source={
+                    space.space_image
+                      ? {uri: space.space_image}
+                      : require('../assets/images/Space_default.jpg')
+                  }
+                  style={styles.spaceImage}
                   resizeMode="cover"
-                  onError={(e) => {
+                  onError={e => {
                     console.log('Space image load error:', {
                       spaceId: space.id,
                       spaceName: space.name,
                       space_image: space.space_image,
-                      error: e.nativeEvent
+                      error: e.nativeEvent,
                     });
                   }}
                 />
@@ -190,7 +196,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 15,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
