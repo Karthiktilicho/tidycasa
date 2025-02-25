@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import BottomNavBar from '../components/BottomNavBar';
 import SkeletonLoader from '../components/SkeletonLoader';
+import Snackbar from 'react-native-snackbar';
 
 const BASE_URL = 'http://13.49.68.11:3000';
 
@@ -64,12 +65,23 @@ const CollectionsScreen = ({navigation}) => {
     } catch (error) {
       console.error('Error fetching collections:', error);
 
-      Alert.alert('Error', 'Could not fetch collections. Please try again.', [
-        {
+      // Alert.alert('Error', 'Could not fetch collections. Please try again.', [
+      //   {
+      //     text: 'Retry',
+      //     onPress: fetchCollections,
+      //   },
+      // ]);
+
+      Snackbar.show({
+        text: error.response?.data?.message || 'Failed to change password',
+        duration: Snackbar.LENGTH_SHORT,
+        action: {
           text: 'Retry',
-          onPress: fetchCollections,
+          onPress: () => {
+            fetchCollections();
+          },
         },
-      ]);
+      });
 
       setLoading(false);
     }

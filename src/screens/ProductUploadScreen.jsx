@@ -1,29 +1,34 @@
-import React, {useEffect, useState, useRef} from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import React, {useEffect, useRef, useState} from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  TextInput,
-  ScrollView,
-  FlatList,
   Alert,
+  Animated,
+  FlatList,
+  Image,
+  Linking,
   Modal,
   PermissionsAndroid,
   Platform,
-  Linking,
-  Animated,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
+import Snackbar from 'react-native-snackbar';
 import BottomNavBar from '../components/BottomNavBar';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
 const BASE_URL = 'http://13.49.68.11:3000';
 const ProductUpload = ({navigation, route}) => {
   const [images, setImages] = useState([]);
-  const [productName, setProductName] = useState(route.params?.prefillData?.title || '');
-  const [description, setDescription] = useState(route.params?.prefillData?.description || '');
+  const [productName, setProductName] = useState(
+    route.params?.prefillData?.title || '',
+  );
+  const [description, setDescription] = useState(
+    route.params?.prefillData?.description || '',
+  );
   const [price, setPrice] = useState(route.params?.prefillData?.price || '');
   const [selectedSpace, setSelectedSpace] = useState(null);
   const [showSpaceInput, setShowSpaceInput] = useState(false);
@@ -43,7 +48,9 @@ const ProductUpload = ({navigation, route}) => {
   const [loadingCollections, setLoadingCollections] = useState(true);
 
   const checkAndroidPermissions = async () => {
-    if (Platform.OS !== 'android') return true;
+    if (Platform.OS !== 'android') {
+      return true;
+    }
 
     try {
       // For Android 13 and above (API level 33+)
@@ -97,6 +104,8 @@ const ProductUpload = ({navigation, route}) => {
         {text: 'Open Settings', onPress: openSettings},
       ],
     );
+
+    // Snackbar.show('Failed to pick image', Snackbar.LENGTH_SHORT);
   };
 
   const openSettings = () => {
@@ -126,9 +135,10 @@ const ProductUpload = ({navigation, route}) => {
         if (response.errorCode) {
           console.error('Image picker error:', {
             code: response.errorCode,
-            message: response.errorMessage
+            message: response.errorMessage,
           });
-          Alert.alert('Error', 'Failed to pick image');
+          // Alert.alert('Error', 'Failed to pick image');
+          Snackbar.show('Failed to pick image', Snackbar.LENGTH_SHORT);
           return;
         }
 
@@ -153,7 +163,11 @@ const ProductUpload = ({navigation, route}) => {
           setImages([...images, ...imageUris]);
         } catch (error) {
           console.error('Error processing images:', error);
-          Alert.alert('Error', 'Failed to process the selected images');
+          // Alert.alert('Error', 'Failed to process the selected images');
+          Snackbar.show(
+            'Failed to process the selected images',
+            Snackbar.LENGTH_SHORT,
+          );
         }
       });
     }
@@ -178,9 +192,10 @@ const ProductUpload = ({navigation, route}) => {
         if (response.errorCode) {
           console.error('Camera error:', {
             code: response.errorCode,
-            message: response.errorMessage
+            message: response.errorMessage,
           });
-          Alert.alert('Error', 'Failed to capture image');
+          // Alert.alert('Error', 'Failed to capture image');
+          Snackbar.show('Failed to capture image', Snackbar.LENGTH_SHORT);
           return;
         }
 
@@ -191,7 +206,7 @@ const ProductUpload = ({navigation, route}) => {
             type: selectedImage.type || 'image/jpeg',
             fileSize: selectedImage.fileSize,
             width: selectedImage.width,
-            height: selectedImage.height
+            height: selectedImage.height,
           });
 
           // Ensure the image has a proper file path
@@ -205,11 +220,15 @@ const ProductUpload = ({navigation, route}) => {
           navigation.navigate('OnlineProductSearch', {
             imageUri: imageUri,
             imageType: selectedImage.type || 'image/jpeg',
-            returnToUpload: true
+            returnToUpload: true,
           });
         } catch (error) {
           console.error('Error processing camera image:', error);
-          Alert.alert('Error', 'Failed to process the captured image');
+          // Alert.alert('Error', 'Failed to process the captured image');
+          Snackbar.show(
+            'Failed to process the capture image',
+            Snackbar.LENGTH_SHORT,
+          );
         }
       });
     }
@@ -217,7 +236,9 @@ const ProductUpload = ({navigation, route}) => {
 
   const handleAddImage = async () => {
     const hasPermission = await checkAndroidPermissions();
-    if (!hasPermission) return;
+    if (!hasPermission) {
+      return;
+    }
 
     const result = await launchImageLibrary({
       mediaType: 'photo',
@@ -229,7 +250,11 @@ const ProductUpload = ({navigation, route}) => {
     if (result.didCancel) {
       console.log('User cancelled image selection');
     } else if (result.errorCode) {
-      Alert.alert('Error', 'Failed to select photos: ' + result.errorMessage);
+      // Alert.alert('Error', 'Failed to select photos: ' + result.errorMessage);
+      Snackbar.show(
+        'Failed to select photos: ' + result.errorMessage,
+        Snackbar.LENGTH_SHORT,
+      );
     } else if (result.assets) {
       const newImages = result.assets.map(image => ({
         uri: image.uri,
@@ -252,7 +277,7 @@ const ProductUpload = ({navigation, route}) => {
     }
   };
 
-  const handleImageUpload = (imageFile) => {
+  const handleImageUpload = imageFile => {
     if (images.length === 0) {
       // If it's the first image, trigger the search
       searchProducts(imageFile);
@@ -262,28 +287,28 @@ const ProductUpload = ({navigation, route}) => {
     }
   };
 
-  const searchProducts = async (imageFile) => {
+  const searchProducts = async imageFile => {
     try {
       setLoading(true);
       setError(null);
       console.log('Starting product search with image:', imageFile);
-      
+
       const formData = new FormData();
       formData.append('search_image', {
         uri: imageFile.uri,
         type: 'image/jpeg',
-        name: 'search_image.jpg'
+        name: 'search_image.jpg',
       });
 
       console.log('Making API request to:', `${BASE_URL}/search-product`);
-      
+
       const response = await fetch(`${BASE_URL}/search-product`, {
         method: 'POST',
         headers: {
-          'Accept': 'application/json',
+          Accept: 'application/json',
           'Content-Type': 'multipart/form-data',
         },
-        body: formData
+        body: formData,
       });
 
       console.log('Response status:', response.status);
@@ -319,19 +344,21 @@ const ProductUpload = ({navigation, route}) => {
       console.error('Error stack:', error.stack);
 
       let errorMessage = 'Failed to search products. ';
-      
+
       if (!navigator.onLine) {
         errorMessage += 'Please check your internet connection.';
       } else if (error.message.includes('timeout')) {
         errorMessage += 'Request timed out. Please try again.';
       } else if (error.message.includes('413')) {
-        errorMessage += 'Image file is too large. Please choose a smaller image.';
+        errorMessage +=
+          'Image file is too large. Please choose a smaller image.';
       } else {
         errorMessage += error.message;
       }
 
       setError(errorMessage);
-      Alert.alert('Error', errorMessage);
+      // Alert.alert('Error', errorMessage);
+      Snackbar.show(errorMessage, Snackbar.LENGTH_SHORT);
     } finally {
       setLoading(false);
     }
@@ -374,18 +401,22 @@ const ProductUpload = ({navigation, route}) => {
 
   const handleCreateCollection = async () => {
     if (!newCollectionName.trim()) {
-      Alert.alert('Error', 'Please enter a collection name');
+      // Alert.alert('Error', 'Please enter a collection name');
+      Snackbar.show('Please enter a collection name', Snackbar.LENGTH_SHORT);
       return;
     }
 
     try {
       const token = await AsyncStorage.getItem('accessToken');
-      
+
       // Create form data for the collection
       const formData = new FormData();
       formData.append('collection_name', newCollectionName.trim());
-      formData.append('description', newCollectionDescription.trim() || newCollectionName.trim());
-      
+      formData.append(
+        'description',
+        newCollectionDescription.trim() || newCollectionName.trim(),
+      );
+
       // Add collection image if available
       if (newCollectionImage) {
         formData.append('collection_image', {
@@ -395,16 +426,12 @@ const ProductUpload = ({navigation, route}) => {
         });
       }
 
-      const response = await axios.post(
-        `${BASE_URL}/collections`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data',
-          },
+      const response = await axios.post(`${BASE_URL}/collections`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
         },
-      );
+      });
 
       if (response.data) {
         const newCollection = {
@@ -421,36 +448,49 @@ const ProductUpload = ({navigation, route}) => {
         setNewCollectionDescription('');
         setNewCollectionImage(null);
 
-        Alert.alert('Success', 'Collection created successfully!');
+        // Alert.alert('Success', 'Collection created successfully!');
+        Snackbar.show(
+          'Collection created successfully!',
+          Snackbar.LENGTH_SHORT,
+        );
       }
     } catch (error) {
       console.error('Error creating collection:', error);
-      Alert.alert(
-        'Error',
-        error.response?.data?.message || 'Failed to create collection'
+      // Alert.alert(
+      //   'Error',
+      //   error.response?.data?.message || 'Failed to create collection',
+      // );
+      Snackbar.show(
+        error.response?.data?.message || 'Failed to create collection',
+        Snackbar.LENGTH_SHORT,
       );
     }
   };
 
   const handleCreateSpace = async () => {
     if (!newSpaceName.trim()) {
-      Alert.alert('Error', 'Please enter a space name');
+      // Alert.alert('Error', 'Please enter a space name');
+      Snackbar.show('Please enter a space name', Snackbar.LENGTH_SHORT);
       return;
     }
 
     if (!newSpaceImage) {
-      Alert.alert('Error', 'Please select a space image');
+      Snackbar.show('Please select a space image', Snackbar.LENGTH_SHORT);
+      // Alert.alert('Error', 'Please select a space image');
       return;
     }
 
     try {
       const token = await AsyncStorage.getItem('accessToken');
-      
+
       // Create form data for the space
       const formData = new FormData();
       formData.append('space_name', newSpaceName.trim());
-      formData.append('description', newSpaceDescription.trim() || newSpaceName.trim());
-      
+      formData.append(
+        'description',
+        newSpaceDescription.trim() || newSpaceName.trim(),
+      );
+
       // Add space image (mandatory)
       formData.append('space_image', {
         uri: newSpaceImage.uri,
@@ -458,20 +498,16 @@ const ProductUpload = ({navigation, route}) => {
         name: 'space_image.jpg',
       });
 
-      const response = await axios.post(
-        `${BASE_URL}/spaces`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data',
-          },
+      const response = await axios.post(`${BASE_URL}/spaces`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
         },
-      );
+      });
 
       if (response.data) {
         console.log('Space creation response:', response.data);
-        
+
         const newSpace = {
           id: response.data.data.id,
           name: response.data.data.space_name || newSpaceName.trim(),
@@ -488,13 +524,18 @@ const ProductUpload = ({navigation, route}) => {
         setNewSpaceDescription('');
         setNewSpaceImage(null);
 
-        Alert.alert('Success', 'Space created successfully!');
+        // Alert.alert('Success', 'Space created successfully!');
+        Snackbar.show('Space created successfully!', Snackbar.LENGTH_SHORT);
       }
     } catch (error) {
       console.error('Error creating space:', error.response?.data || error);
-      Alert.alert(
-        'Error',
-        error.response?.data?.message || 'Failed to create space'
+      // Alert.alert(
+      //   'Error',
+      //   error.response?.data?.message || 'Failed to create space',
+      // );
+      Snackbar.show(
+        error.response?.data?.message || 'Failed to create space',
+        Snackbar.LENGTH_SHORT,
       );
     }
   };
@@ -502,32 +543,41 @@ const ProductUpload = ({navigation, route}) => {
   const handleUpload = async () => {
     try {
       if (!productName.trim()) {
-        Alert.alert('Error', 'Please enter product name');
+        // Alert.alert('Error', 'Please enter product name');
+        Snackbar.show('Please enter product name', Snackbar.LENGTH_SHORT);
         return;
       }
 
       if (!description.trim()) {
-        Alert.alert('Error', 'Please enter description');
+        // Alert.alert('Error', 'Please enter description');
+        Snackbar.show('Please enter description', Snackbar.LENGTH_SHORT);
         return;
       }
 
       if (!price.trim() || isNaN(parseFloat(price))) {
-        Alert.alert('Error', 'Please enter a valid price');
+        // Alert.alert('Error', 'Please enter a valid price');
+        Snackbar.show('Please enter a valid price', Snackbar.LENGTH_SHORT);
         return;
       }
 
       if (!selectedSpace?.id) {
-        Alert.alert('Error', 'Please select a space');
+        // Alert.alert('Error', 'Please select a space');
+        Snackbar.show('Please select a space', Snackbar.LENGTH_SHORT);
         return;
       }
 
       if (!selectedCollections?.length) {
-        Alert.alert('Error', 'Please select at least one collection');
+        // Alert.alert('Error', 'Please select at least one collection');
+        Snackbar.show(
+          'Please select at least one collection',
+          Snackbar.LENGTH_SHORT,
+        );
         return;
       }
 
       if (!images?.length) {
-        Alert.alert('Error', 'Please add at least one image');
+        // Alert.alert('Error', 'Please add at least one image');
+        Snackbar.show('Please add at least one image', Snackbar.LENGTH_SHORT);
         return;
       }
 
@@ -579,11 +629,30 @@ const ProductUpload = ({navigation, route}) => {
       console.log('Upload response:', response.data);
 
       if (response.data && response.data.type === 'success') {
-        Alert.alert('Success', 'Product uploaded successfully!', [
-          {
+        // Alert.alert('Success', 'Product uploaded successfully!', [
+        //   {
+        //     text: 'OK',
+        //     onPress: () => {
+        //       // Reset form
+        //       setImages([]);
+        //       setProductName('');
+        //       setDescription('');
+        //       setPrice('');
+        //       setSelectedSpace(null);
+        //       setSelectedCollections([]);
+        //       // Navigate back to space
+        //       navigation.navigate('IndividualSpace', {
+        //         spaceId: selectedSpace.id.toString(),
+        //       });
+        //     },
+        //   },
+        // ]);
+
+        Snackbar.show({
+          text: 'Product uploaded successfully',
+          action: {
             text: 'OK',
             onPress: () => {
-              // Reset form
               setImages([]);
               setProductName('');
               setDescription('');
@@ -596,7 +665,7 @@ const ProductUpload = ({navigation, route}) => {
               });
             },
           },
-        ]);
+        });
       } else {
         throw new Error('Upload failed: Invalid response from server');
       }
@@ -605,11 +674,17 @@ const ProductUpload = ({navigation, route}) => {
         'Error uploading product:',
         error.response?.data || error.message,
       );
-      Alert.alert(
-        'Error',
+      // Alert.alert(
+      //   'Error',
+      //   error.response?.data?.message ||
+      //     error.message ||
+      //     'Failed to upload product',
+      // );
+      Snackbar.show(
         error.response?.data?.message ||
           error.message ||
           'Failed to upload product',
+        Snackbar.LENGTH_SHORT,
       );
     }
   };
@@ -670,14 +745,20 @@ const ProductUpload = ({navigation, route}) => {
       }
     } catch (error) {
       console.error('Error fetching collections:', error);
-      Alert.alert('Error', 'An error occurred while fetching collections.');
+      // Alert.alert('Error', 'An error occurred while fetching collections.');
+      Snackbar.show(
+        'An error occurred while fetching collections.',
+        Snackbar.LENGTH_SHORT,
+      );
       setLoadingCollections(false);
     }
   };
 
   const toggleCollection = collection => {
-    if (!collection?.id) return;
-    
+    if (!collection?.id) {
+      return;
+    }
+
     setSelectedCollections(prev => {
       const isSelected = prev.some(c => c.id === collection.id);
       if (isSelected) {
@@ -690,28 +771,29 @@ const ProductUpload = ({navigation, route}) => {
 
   useEffect(() => {
     if (route.params?.prefillData) {
-      const { title, price, description, productImage, uploadedImage } = route.params.prefillData;
+      const {title, price, description, productImage, uploadedImage} =
+        route.params.prefillData;
       setProductName(title);
       // Ensure price is a clean number without currency symbols
       setPrice(price ? price.toString().replace(/[^0-9.]/g, '') : '');
       setDescription(description);
-      
+
       // Handle the uploaded/captured image
       if (uploadedImage) {
         const uploadedImageObj = {
           uri: uploadedImage,
           type: 'image/jpeg',
-          name: 'uploaded_image.jpg'
+          name: 'uploaded_image.jpg',
         };
         setImages([uploadedImageObj]);
       }
-      
+
       // Handle the product image from search results
       if (productImage) {
         const productImageObj = {
           uri: productImage,
           type: 'image/jpeg',
-          name: 'product_image.jpg'
+          name: 'product_image.jpg',
         };
         // Add product image if we don't have an uploaded image
         if (!uploadedImage) {
@@ -721,28 +803,34 @@ const ProductUpload = ({navigation, route}) => {
     }
   }, [route.params?.prefillData]);
 
-  const formatTitle = (title) => {
-    if (!title) return '';
-    
+  const formatTitle = title => {
+    if (!title) {
+      return '';
+    }
+
     // Split into chunks of 25 characters, maintaining word boundaries
     const words = title.split(' ');
     let lines = [];
     let currentLine = '';
-    
+
     for (const word of words) {
       if (currentLine.length + word.length + 1 <= 25) {
         currentLine += (currentLine.length ? ' ' : '') + word;
       } else {
-        if (currentLine.length) lines.push(currentLine);
+        if (currentLine.length) {
+          lines.push(currentLine);
+        }
         currentLine = word;
       }
     }
-    if (currentLine.length) lines.push(currentLine);
-    
+    if (currentLine.length) {
+      lines.push(currentLine);
+    }
+
     return lines.join('\n');
   };
 
-  const handleProductSelect = (product) => {
+  const handleProductSelect = product => {
     if (route.params?.returnToUpload) {
       navigation.navigate('ProductUpload', {
         prefillData: {
@@ -751,7 +839,7 @@ const ProductUpload = ({navigation, route}) => {
           description: product.description || '',
           productImage: product.image || null,
           uploadedImage: route.params?.imageUri,
-        }
+        },
       });
     }
   };
@@ -770,10 +858,10 @@ const ProductUpload = ({navigation, route}) => {
         data={images}
         horizontal
         showsHorizontalScrollIndicator={false}
-        renderItem={({ item, index }) => (
+        renderItem={({item, index}) => (
           <View style={styles.imageContainer}>
             <Image
-              source={{ uri: item.uri }}
+              source={{uri: item.uri}}
               style={styles.selectedImage}
               resizeMode="contain"
             />
@@ -821,7 +909,7 @@ const ProductUpload = ({navigation, route}) => {
             duration: 1000,
             useNativeDriver: true,
           }),
-        ])
+        ]),
       );
       animation.start();
       return () => animation.stop();
@@ -834,19 +922,18 @@ const ProductUpload = ({navigation, route}) => {
 
     return (
       <View style={styles.collectionSkeletonCard}>
-        <Animated.View style={[styles.collectionSkeletonImage, { opacity }]} />
+        <Animated.View style={[styles.collectionSkeletonImage, {opacity}]} />
         <View style={styles.collectionSkeletonContent}>
-          <Animated.View style={[styles.collectionSkeletonText, { opacity }]} />
+          <Animated.View style={[styles.collectionSkeletonText, {opacity}]} />
         </View>
       </View>
     );
   };
 
   const renderSkeleton = () => (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.scrollContent}
-    >
+      contentContainerStyle={styles.scrollContent}>
       <SkeletonCard />
       <SkeletonCard />
       <SkeletonCard />
@@ -870,9 +957,7 @@ const ProductUpload = ({navigation, route}) => {
 
         {/* Image Upload Section */}
         <View style={styles.uploadSection}>
-          <View style={styles.imageSection}>
-            {renderImagePreview()}
-          </View>
+          <View style={styles.imageSection}>{renderImagePreview()}</View>
 
           <View style={styles.buttonContainer}>
             <TouchableOpacity
@@ -936,9 +1021,11 @@ const ProductUpload = ({navigation, route}) => {
                   <View style={styles.spaceItemContent}>
                     {space.space_image ? (
                       <Image
-                        source={{ uri: space.space_image }}
+                        source={{uri: space.space_image}}
                         style={styles.spaceItemImage}
-                        onError={(e) => console.log('Space image load error:', e.nativeEvent)}
+                        onError={e =>
+                          console.log('Space image load error:', e.nativeEvent)
+                        }
                       />
                     ) : (
                       <Image
@@ -950,12 +1037,14 @@ const ProductUpload = ({navigation, route}) => {
                       <Text
                         style={[
                           styles.spaceText,
-                          selectedSpace?.id === space.id && styles.selectedSpaceText,
+                          selectedSpace?.id === space.id &&
+                            styles.selectedSpaceText,
                         ]}>
                         {space.name}
                       </Text>
                       <Text style={styles.spaceItemCount}>
-                        {space.total_products} {space.total_products === 1 ? 'Item' : 'Items'}
+                        {space.total_products}{' '}
+                        {space.total_products === 1 ? 'Item' : 'Items'}
                       </Text>
                     </View>
                   </View>
@@ -989,9 +1078,14 @@ const ProductUpload = ({navigation, route}) => {
                     ]}
                     onPress={() => toggleCollection(collection)}>
                     <Image
-                      source={{ uri: collection.image }}
+                      source={{uri: collection.image}}
                       style={styles.collectionItemImage}
-                      onError={(e) => console.log('Collection image load error:', e.nativeEvent)}
+                      onError={e =>
+                        console.log(
+                          'Collection image load error:',
+                          e.nativeEvent,
+                        )
+                      }
                     />
                     <Text
                       style={[
@@ -1029,7 +1123,9 @@ const ProductUpload = ({navigation, route}) => {
           activeOpacity={1}
           onPress={() => setShowImageOptions(false)}>
           <View style={styles.modalContent}>
-            <TouchableOpacity style={styles.modalOption} onPress={handleCameraLaunch}>
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={handleCameraLaunch}>
               <Text style={styles.modalOptionText}>Take Photo</Text>
             </TouchableOpacity>
             <View style={styles.modalDivider} />
@@ -1065,7 +1161,9 @@ const ProductUpload = ({navigation, route}) => {
               onPress={async () => {
                 try {
                   const hasPermission = await checkAndroidPermissions();
-                  if (!hasPermission) return;
+                  if (!hasPermission) {
+                    return;
+                  }
 
                   const result = await launchImageLibrary({
                     mediaType: 'photo',
@@ -1081,7 +1179,11 @@ const ProductUpload = ({navigation, route}) => {
                     setNewSpaceImage(result.assets[0]);
                   }
                 } catch (error) {
-                  Alert.alert('Error', 'Failed to select photo');
+                  // Alert.alert('Error', 'Failed to select photo');
+                  Snackbar.show(
+                    'Failed to select photo',
+                    Snackbar.LENGTH_SHORT,
+                  );
                 }
               }}>
               {newSpaceImage ? (
@@ -1090,7 +1192,9 @@ const ProductUpload = ({navigation, route}) => {
                   style={styles.previewImage}
                 />
               ) : (
-                <Text style={styles.imagePickerText}>Add Space Image (Required)</Text>
+                <Text style={styles.imagePickerText}>
+                  Add Space Image (Required)
+                </Text>
               )}
             </TouchableOpacity>
 
@@ -1103,7 +1207,7 @@ const ProductUpload = ({navigation, route}) => {
               value={newSpaceName}
               onChangeText={setNewSpaceName}
             />
-            
+
             <TextInput
               style={[styles.modalInput, styles.textArea]}
               placeholder="Space Description (Optional)"
@@ -1124,12 +1228,13 @@ const ProductUpload = ({navigation, route}) => {
                 }}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[
                   styles.modalButton,
                   styles.createButton,
-                  (!newSpaceName.trim() || !newSpaceImage) && styles.disabledButton,
+                  (!newSpaceName.trim() || !newSpaceImage) &&
+                    styles.disabledButton,
                 ]}
                 onPress={handleCreateSpace}
                 disabled={!newSpaceName.trim() || !newSpaceImage}>
@@ -1148,8 +1253,8 @@ const ProductUpload = ({navigation, route}) => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Create New Collection</Text>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.imagePickerButton}
               onPress={async () => {
                 try {
@@ -1169,7 +1274,7 @@ const ProductUpload = ({navigation, route}) => {
               }}>
               {newCollectionImage ? (
                 <Image
-                  source={{ uri: newCollectionImage.uri }}
+                  source={{uri: newCollectionImage.uri}}
                   style={styles.previewImage}
                 />
               ) : (
@@ -1183,7 +1288,7 @@ const ProductUpload = ({navigation, route}) => {
               value={newCollectionName}
               onChangeText={setNewCollectionName}
             />
-            
+
             <TextInput
               style={[styles.modalInput, styles.textArea]}
               placeholder="Collection Description"
@@ -1204,7 +1309,7 @@ const ProductUpload = ({navigation, route}) => {
                 }}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[styles.modalButton, styles.createButton]}
                 onPress={handleCreateCollection}>

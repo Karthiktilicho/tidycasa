@@ -1,24 +1,25 @@
-import React, { useState } from 'react';
-import { 
-  StyleSheet, 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  Image, 
+import React, {useState} from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Image,
   StatusBar,
   ActivityIndicator,
   Alert,
-  Modal
+  Modal,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import {useNavigation} from '@react-navigation/native';
+import Snackbar from 'react-native-snackbar';
 
 const BASE_URL = 'http://13.49.68.11:3000';
 
-const ChangePasswordScreen = ({ navigation }) => {
+const ChangePasswordScreen = ({navigation}) => {
   const nav = useNavigation();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -29,13 +30,13 @@ const ChangePasswordScreen = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  const validatePassword = (password) => {
+  const validatePassword = password => {
     return password.length >= 6;
   };
 
   const handleSubmit = async () => {
     let isValid = true;
-    
+
     // Reset errors
     setCurrentPasswordError('');
     setNewPasswordError('');
@@ -74,18 +75,18 @@ const ChangePasswordScreen = ({ navigation }) => {
         }
 
         const response = await axios.put(
-          `${BASE_URL}/profile/update-password`, 
-          { 
-            currentPassword, 
-            newPassword, 
-            confirmPassword 
+          `${BASE_URL}/profile/update-password`,
+          {
+            currentPassword,
+            newPassword,
+            confirmPassword,
           },
-          { 
+          {
             headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          }
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          },
         );
 
         if (response.data) {
@@ -96,10 +97,17 @@ const ChangePasswordScreen = ({ navigation }) => {
           setConfirmPassword('');
         }
       } catch (error) {
-        console.error('Password change error:', error.response?.data || error.message);
-        Alert.alert(
-          'Error',
-          error.response?.data?.message || 'Failed to change password'
+        console.error(
+          'Password change error:',
+          error.response?.data || error.message,
+        );
+        // Alert.alert(
+        //   'Error',
+        //   error.response?.data?.message || 'Failed to change password'
+        // );
+        Snackbar.show(
+          error.response?.data?.message || 'Failed to change password',
+          Snackbar.LENGTH_SHORT,
         );
       } finally {
         setIsLoading(false);
@@ -138,21 +146,18 @@ const ChangePasswordScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#6B46C1" barStyle="light-content" />
-      
+
       {/* Header with Gradient */}
-      <LinearGradient
-        colors={['#6B46C1', '#9F7AEA']}
-        style={styles.header}
-      >
+      <LinearGradient colors={['#6B46C1', '#9F7AEA']} style={styles.header}>
         <View style={styles.headerTop}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Image 
-              source={require('../assets/images/arrow_back.png')} 
-              style={[styles.icon, { tintColor: '#FFFFFF' }]}
+            <Image
+              source={require('../assets/images/arrow_back.png')}
+              style={[styles.icon, {tintColor: '#FFFFFF'}]}
             />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Change Password</Text>
-          <View style={{ width: 24 }} /> {/* For alignment */}
+          <View style={{width: 24}} /> {/* For alignment */}
         </View>
       </LinearGradient>
 
@@ -163,7 +168,7 @@ const ChangePasswordScreen = ({ navigation }) => {
           <TextInput
             style={[styles.input, currentPasswordError && styles.inputError]}
             value={currentPassword}
-            onChangeText={(text) => {
+            onChangeText={text => {
               setCurrentPassword(text);
               setCurrentPasswordError('');
             }}
@@ -171,7 +176,9 @@ const ChangePasswordScreen = ({ navigation }) => {
             placeholderTextColor="#666666"
             editable={!isLoading}
           />
-          {currentPasswordError ? <Text style={styles.errorText}>{currentPasswordError}</Text> : null}
+          {currentPasswordError ? (
+            <Text style={styles.errorText}>{currentPasswordError}</Text>
+          ) : null}
         </View>
 
         <View style={styles.inputGroup}>
@@ -179,7 +186,7 @@ const ChangePasswordScreen = ({ navigation }) => {
           <TextInput
             style={[styles.input, newPasswordError && styles.inputError]}
             value={newPassword}
-            onChangeText={(text) => {
+            onChangeText={text => {
               setNewPassword(text);
               setNewPasswordError('');
             }}
@@ -187,7 +194,9 @@ const ChangePasswordScreen = ({ navigation }) => {
             placeholderTextColor="#666666"
             editable={!isLoading}
           />
-          {newPasswordError ? <Text style={styles.errorText}>{newPasswordError}</Text> : null}
+          {newPasswordError ? (
+            <Text style={styles.errorText}>{newPasswordError}</Text>
+          ) : null}
         </View>
 
         <View style={styles.inputGroup}>
@@ -195,7 +204,7 @@ const ChangePasswordScreen = ({ navigation }) => {
           <TextInput
             style={[styles.input, confirmPasswordError && styles.inputError]}
             value={confirmPassword}
-            onChangeText={(text) => {
+            onChangeText={text => {
               setConfirmPassword(text);
               setConfirmPasswordError('');
             }}
@@ -203,14 +212,15 @@ const ChangePasswordScreen = ({ navigation }) => {
             placeholderTextColor="#666666"
             editable={!isLoading}
           />
-          {confirmPasswordError ? <Text style={styles.errorText}>{confirmPasswordError}</Text> : null}
+          {confirmPasswordError ? (
+            <Text style={styles.errorText}>{confirmPasswordError}</Text>
+          ) : null}
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.button, isLoading && styles.buttonDisabled]}
           onPress={handleSubmit}
-          disabled={isLoading}
-        >
+          disabled={isLoading}>
           {isLoading ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (

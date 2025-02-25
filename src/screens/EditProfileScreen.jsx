@@ -1,41 +1,55 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, Image, TouchableOpacity, TextInput, StatusBar, Alert, ScrollView } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
-import { launchImageLibrary } from 'react-native-image-picker';
-import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import React, {useEffect, useState} from 'react';
+import {
+  Alert,
+  Image,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import {launchImageLibrary} from 'react-native-image-picker';
+import LinearGradient from 'react-native-linear-gradient';
+import Snackbar from 'react-native-snackbar';
 
-const EditProfileScreen = ({ navigation, route }) => {
-  const { initialName, initialPhone, initialProfileImage } = route.params || {};
+const EditProfileScreen = ({navigation, route}) => {
+  const {initialName, initialPhone, initialProfileImage} = route.params || {};
   const [profileImage, setProfileImage] = useState(
     initialProfileImage
-      ? { uri: initialProfileImage }
-      : require('../assets/images/profile.png')
+      ? {uri: initialProfileImage}
+      : require('../assets/images/profile.png'),
   );
   const [userProfile, setUserProfile] = useState({
     name: initialName || '',
-    phone: initialPhone || ''
+    phone: initialPhone || '',
   });
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     // Update profile image when route params change
     if (route.params?.initialProfileImage) {
-      setProfileImage({ uri: route.params.initialProfileImage });
+      setProfileImage({uri: route.params.initialProfileImage});
     }
   }, [route.params?.initialProfileImage]);
 
   const handleUpdateProfile = async () => {
     if (!userProfile.name) {
-      Alert.alert('Error', 'Name is required');
+      // Alert.alert('Error', 'Name is required');
+      Snackbar.show('Error', 'Name is required', Snackbar.LENGTH_SHORT);
       return;
     }
 
     setIsLoading(true);
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token) throw new Error('No token found');
-      
+      if (!token) {
+        throw new Error('No token found');
+      }
+
       const formData = new FormData();
       formData.append('username', userProfile.name);
       formData.append('phone_number', userProfile.phone);
@@ -45,7 +59,7 @@ const EditProfileScreen = ({ navigation, route }) => {
         const imageFile = {
           uri: profileImage.uri,
           type: 'image/jpeg',
-          name: 'profile_image.jpg'
+          name: 'profile_image.jpg',
         };
         console.log('Uploading image:', imageFile);
         formData.append('profile_image', imageFile);
@@ -56,53 +70,81 @@ const EditProfileScreen = ({ navigation, route }) => {
         'http://13.49.68.11:3000/profile/update-profile',
         formData,
         {
-          headers: { 
-            'Authorization': `Bearer ${token}`,
+          headers: {
+            Authorization: `Bearer ${token}`,
             'Content-Type': 'multipart/form-data',
-            'Accept': 'application/json'
-          }
-        }
+            Accept: 'application/json',
+          },
+        },
       );
 
       console.log('Update response:', response.data);
 
       if (response.data) {
         // Get the updated profile to ensure we have the latest data
-        const profileResponse = await axios.get('http://13.49.68.11:3000/profile', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        const profileResponse = await axios.get(
+          'http://13.49.68.11:3000/profile',
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          },
+        );
 
         const updatedProfileData = profileResponse.data.data;
-        
-        Alert.alert(
-          'Success',
-          'Profile updated successfully',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Navigate back with the latest profile data
-                navigation.navigate('Profile', { 
-                  refresh: true,
-                  updatedProfile: {
-                    name: updatedProfileData.name,
-                    phone: updatedProfileData.phone_number,
-                    profile_image: updatedProfileData.profile_image
-                  }
-                });
-              }
-            }
-          ],
-          { cancelable: false }
-        );
+
+        // Alert.alert(
+        //   'Success',
+        //   'Profile updated successfully',
+        //   [
+        //     {
+        //       text: 'OK',
+        //       onPress: () => {
+        //         // Navigate back with the latest profile data
+        //         navigation.navigate('Profile', {
+        //           refresh: true,
+        //           updatedProfile: {
+        //             name: updatedProfileData.name,
+        //             phone: updatedProfileData.phone_number,
+        //             profile_image: updatedProfileData.profile_image,
+        //           },
+        //         });
+        //       },
+        //     },
+        //   ],
+        //   {cancelable: false},
+        // );
+
+        Snackbar.show({
+          text: 'Error, Name is required',
+          duration: Snackbar.LENGTH_INDEFINITE,
+          action: {
+            text: 'OK',
+            onPress: () => {
+              navigation.navigate('Profile', {
+                refresh: true,
+                updatedProfile: {
+                  name: updatedProfileData.name,
+                  phone: updatedProfileData.phone_number,
+                  profile_image: updatedProfileData.profile_image,
+                },
+              });
+            },
+          },
+        });
       }
     } catch (error) {
       console.error('Failed to update profile:', error);
       console.error('Error response:', error.response?.data);
-      Alert.alert('Error', error.response?.data?.message || 'Failed to update profile');
+      // Alert.alert(
+      //   'Error',
+      //   error.response?.data?.message || 'Failed to update profile',
+      // );
+      Snackbar.show(
+        error.response?.data?.message || 'Failed to update profile',
+        Snackbar.LENGTH_SHORT,
+      );
     } finally {
       setIsLoading(false);
     }
@@ -117,13 +159,14 @@ const EditProfileScreen = ({ navigation, route }) => {
 
     try {
       const result = await launchImageLibrary(options);
-      
+
       if (result.didCancel) {
         return;
       }
 
       if (result.errorCode) {
-        Alert.alert('Error', 'Failed to pick image');
+        // Alert.alert('Error', 'Failed to pick image');
+        Snackbar.show('Failed to pick image', Snackbar.LENGTH_SHORT);
         return;
       }
 
@@ -131,36 +174,38 @@ const EditProfileScreen = ({ navigation, route }) => {
         const selectedImage = result.assets[0];
         // Check file size (limit to 5MB)
         if (selectedImage.fileSize > 5 * 1024 * 1024) {
-          Alert.alert('Error', 'Image size should be less than 5MB');
+          // Alert.alert('Error', 'Image size should be less than 5MB');
+          Snackbar.show(
+            'Image size should be less than 5MB',
+            Snackbar.LENGTH_SHORT,
+          );
           return;
         }
 
         console.log('Selected image:', selectedImage);
-        setProfileImage({ 
+        setProfileImage({
           uri: selectedImage.uri,
           type: selectedImage.type || 'image/jpeg',
-          name: selectedImage.fileName || 'profile_image.jpg'
+          name: selectedImage.fileName || 'profile_image.jpg',
         });
       }
     } catch (error) {
       console.error('Image picker error:', error);
-      Alert.alert('Error', 'Failed to pick image');
+      // Alert.alert('Error', 'Failed to pick image');
+      Snackbar.show('Failed to pick image', Snackbar.LENGTH_SHORT);
     }
   };
 
   return (
     <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
       <StatusBar backgroundColor="#6B46C1" barStyle="light-content" />
-      
-      <LinearGradient
-        colors={['#6B46C1', '#9F7AEA']}
-        style={styles.header}
-      >
+
+      <LinearGradient colors={['#6B46C1', '#9F7AEA']} style={styles.header}>
         <View style={styles.headerTop}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Image 
-              source={require('../assets/images/arrow_back.png')} 
-              style={[styles.icon, { tintColor: '#FFFFFF' }]}
+            <Image
+              source={require('../assets/images/arrow_back.png')}
+              style={[styles.icon, {tintColor: '#FFFFFF'}]}
             />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Edit Profile</Text>
@@ -170,17 +215,13 @@ const EditProfileScreen = ({ navigation, route }) => {
         </View>
 
         <View style={styles.profileImageContainer}>
-          <Image 
-            source={profileImage}
-            style={styles.profileImage}
-          />
-          <TouchableOpacity 
+          <Image source={profileImage} style={styles.profileImage} />
+          <TouchableOpacity
             style={styles.editIconContainer}
-            onPress={handleImagePick}
-          >
-            <Image 
+            onPress={handleImagePick}>
+            <Image
               source={require('../assets/images/Edit.png')}
-              style={[styles.editIcon, { resizeMode: 'contain' }]}
+              style={[styles.editIcon, {resizeMode: 'contain'}]}
             />
           </TouchableOpacity>
         </View>
@@ -192,7 +233,9 @@ const EditProfileScreen = ({ navigation, route }) => {
           <TextInput
             style={styles.input}
             value={userProfile.name}
-            onChangeText={(text) => setUserProfile(prev => ({ ...prev, name: text }))}
+            onChangeText={text =>
+              setUserProfile(prev => ({...prev, name: text}))
+            }
             placeholderTextColor="#666666"
             placeholder="Enter your name"
           />
@@ -203,7 +246,9 @@ const EditProfileScreen = ({ navigation, route }) => {
           <TextInput
             style={styles.input}
             value={userProfile.phone}
-            onChangeText={(text) => setUserProfile(prev => ({ ...prev, phone: text }))}
+            onChangeText={text =>
+              setUserProfile(prev => ({...prev, phone: text}))
+            }
             keyboardType="phone-pad"
             placeholderTextColor="#666666"
             placeholder="Enter your phone number"
