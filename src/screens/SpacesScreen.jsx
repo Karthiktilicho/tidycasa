@@ -116,9 +116,9 @@ const SpacesScreen = ({navigation}) => {
             <TouchableOpacity
               style={styles.createSpaceButton}
               onPress={() => navigation.navigate('CreateSpace')}>
-              <Text style={styles.createSpaceButtonText}>
+              {/* <Text style={styles.createSpaceButtonText}>
                 Create First Space
-              </Text>
+              </Text> */}
             </TouchableOpacity>
           </View>
         ) : (
@@ -227,9 +227,14 @@ const styles = StyleSheet.create({
   },
   emptyStateContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'center', // Centers vertically
+    alignItems: 'center', // Centers horizontally
     padding: 20,
+    position: 'absolute', // Positions the container relative to its parent
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   emptyStateText: {
     fontSize: 18,

@@ -133,9 +133,9 @@ const CollectionsScreen = ({navigation}) => {
             <TouchableOpacity
               style={styles.createCollectionButton}
               onPress={() => navigation.navigate('CreateCollection')}>
-              <Text style={styles.createCollectionButtonText}>
+              {/* <Text style={styles.createCollectionButtonText}>
                 Create First Collection
-              </Text>
+              </Text> */}
             </TouchableOpacity>
           </View>
         ) : (
@@ -237,8 +237,8 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'center', // Centers vertically
+    alignItems: 'center', // Centers horizontally
     padding: 20,
   },
   errorText: {
