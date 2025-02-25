@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,13 @@ import {
   RefreshControl,
   Alert,
   Image,
+  Animated,
+  FlatList,
 } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBar from '../components/BottomNavBar';
+import SkeletonLoader from '../components/SkeletonLoader';
 
 const BASE_URL = 'http://13.49.68.11:3000';
 
@@ -86,11 +89,28 @@ const SpacesScreen = ({ navigation }) => {
     fetchSpaces();
   }, [fetchSpaces]);
 
+  const renderSkeletonLoaders = () => (
+    <View style={styles.spacesGrid}>
+      {[1, 2, 3, 4].map(key => (
+        <View key={key} style={styles.spaceCard}>
+          <SkeletonLoader width="100%" height={150} />
+          <View style={styles.spaceInfo}>
+            <SkeletonLoader width="80%" height={20} style={{marginBottom: 8}} />
+            <SkeletonLoader width="40%" height={16} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+
   // Render loading state
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading Spaces...</Text>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Spaces</Text>
+        </View>
+        {renderSkeletonLoaders()}
       </View>
     );
   }
@@ -240,6 +260,27 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  spacesGrid: {
+    padding: 16,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  spaceCard: {
+    width: '48%',
+    marginBottom: 16,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  spaceInfo: {
+    padding: 12,
   },
 });
 

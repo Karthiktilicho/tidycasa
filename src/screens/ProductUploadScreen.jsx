@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useRef} from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   PermissionsAndroid,
   Platform,
   Linking,
+  Animated,
 } from 'react-native';
 import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
 import BottomNavBar from '../components/BottomNavBar';
@@ -39,6 +40,7 @@ const ProductUpload = ({navigation, route}) => {
   const [newCollectionName, setNewCollectionName] = useState('');
   const [newCollectionDescription, setNewCollectionDescription] = useState('');
   const [newCollectionImage, setNewCollectionImage] = useState(null);
+  const [loadingCollections, setLoadingCollections] = useState(true);
 
   const checkAndroidPermissions = async () => {
     if (Platform.OS !== 'android') return true;
@@ -113,6 +115,7 @@ const ProductUpload = ({navigation, route}) => {
         maxHeight: 800,
         maxWidth: 800,
         quality: 0.7,
+        selectionLimit: 10,
       };
 
       launchImageLibrary(options, async response => {
@@ -130,26 +133,27 @@ const ProductUpload = ({navigation, route}) => {
         }
 
         try {
-          const selectedImage = response.assets[0];
-          console.log('Selected image details:', {
-            uri: selectedImage.uri,
-            type: selectedImage.type,
-            fileSize: selectedImage.fileSize,
-            width: selectedImage.width,
-            height: selectedImage.height
+          const selectedImages = response.assets;
+          console.log('Selected images details:', {
+            count: selectedImages.length,
           });
 
-          setImages([...images, selectedImage]);
-          
-          // Navigate to OnlineProductSearchScreen with the selected image
-          navigation.navigate('OnlineProductSearch', {
-            imageUri: selectedImage.uri,
-            imageType: selectedImage.type || 'image/jpeg',
-            returnToUpload: true
+          // Ensure the images have proper file paths
+          const imageUris = selectedImages.map(image => {
+            const imageUri = image.uri.startsWith('file://')
+              ? image.uri
+              : `file://${image.uri}`;
+            return {
+              uri: imageUri,
+              type: image.type || 'image/jpeg',
+              name: `image_${Date.now()}.jpg`,
+            };
           });
+
+          setImages([...images, ...imageUris]);
         } catch (error) {
-          console.error('Error processing image:', error);
-          Alert.alert('Error', 'Failed to process the selected image');
+          console.error('Error processing images:', error);
+          Alert.alert('Error', 'Failed to process the selected images');
         }
       });
     }
@@ -184,17 +188,22 @@ const ProductUpload = ({navigation, route}) => {
           const selectedImage = response.assets[0];
           console.log('Captured image details:', {
             uri: selectedImage.uri,
-            type: selectedImage.type,
+            type: selectedImage.type || 'image/jpeg',
             fileSize: selectedImage.fileSize,
             width: selectedImage.width,
             height: selectedImage.height
           });
 
+          // Ensure the image has a proper file path
+          const imageUri = selectedImage.uri.startsWith('file://')
+            ? selectedImage.uri
+            : `file://${selectedImage.uri}`;
+
           setImages([...images, selectedImage]);
 
           // Navigate to OnlineProductSearchScreen with the captured image
           navigation.navigate('OnlineProductSearch', {
-            imageUri: selectedImage.uri,
+            imageUri: imageUri,
             imageType: selectedImage.type || 'image/jpeg',
             returnToUpload: true
           });
@@ -203,6 +212,128 @@ const ProductUpload = ({navigation, route}) => {
           Alert.alert('Error', 'Failed to process the captured image');
         }
       });
+    }
+  };
+
+  const handleAddImage = async () => {
+    const hasPermission = await checkAndroidPermissions();
+    if (!hasPermission) return;
+
+    const result = await launchImageLibrary({
+      mediaType: 'photo',
+      quality: 0.8,
+      selectionLimit: 0, // Allow multiple images
+      includeBase64: true,
+    });
+
+    if (result.didCancel) {
+      console.log('User cancelled image selection');
+    } else if (result.errorCode) {
+      Alert.alert('Error', 'Failed to select photos: ' + result.errorMessage);
+    } else if (result.assets) {
+      const newImages = result.assets.map(image => ({
+        uri: image.uri,
+        type: image.type || 'image/jpeg',
+        name: `product_image_${Date.now()}.jpg`,
+      }));
+
+      if (images.length === 0) {
+        // If this is the first image, navigate to search
+        setImages([...images, ...newImages]);
+        navigation.navigate('OnlineProductSearch', {
+          imageUri: newImages[0].uri,
+          imageType: newImages[0].type || 'image/jpeg',
+          returnToUpload: true,
+        });
+      } else {
+        // For subsequent images, just add them directly
+        setImages([...images, ...newImages]);
+      }
+    }
+  };
+
+  const handleImageUpload = (imageFile) => {
+    if (images.length === 0) {
+      // If it's the first image, trigger the search
+      searchProducts(imageFile);
+    } else {
+      // For subsequent images, just add them directly
+      setImages(prevImages => [...prevImages, imageFile]);
+    }
+  };
+
+  const searchProducts = async (imageFile) => {
+    try {
+      setLoading(true);
+      setError(null);
+      console.log('Starting product search with image:', imageFile);
+      
+      const formData = new FormData();
+      formData.append('search_image', {
+        uri: imageFile.uri,
+        type: 'image/jpeg',
+        name: 'search_image.jpg'
+      });
+
+      console.log('Making API request to:', `${BASE_URL}/search-product`);
+      
+      const response = await fetch(`${BASE_URL}/search-product`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'multipart/form-data',
+        },
+        body: formData
+      });
+
+      console.log('Response status:', response.status);
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse response:', parseError);
+        throw new Error('Invalid response format from server');
+      }
+
+      console.log('Parsed response data:', responseData);
+
+      if (responseData && Array.isArray(responseData.data)) {
+        if (responseData.data.length === 0) {
+          setError('No matching products found');
+        } else {
+          setSearchResults(responseData.data);
+        }
+      } else {
+        console.error('Invalid response structure:', responseData);
+        throw new Error('Invalid response format from server');
+      }
+    } catch (error) {
+      console.error('Search error:', error.message);
+      console.error('Error stack:', error.stack);
+
+      let errorMessage = 'Failed to search products. ';
+      
+      if (!navigator.onLine) {
+        errorMessage += 'Please check your internet connection.';
+      } else if (error.message.includes('timeout')) {
+        errorMessage += 'Request timed out. Please try again.';
+      } else if (error.message.includes('413')) {
+        errorMessage += 'Image file is too large. Please choose a smaller image.';
+      } else {
+        errorMessage += error.message;
+      }
+
+      setError(errorMessage);
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -531,13 +662,16 @@ const ProductUpload = ({navigation, route}) => {
           image: collection.collection_image,
         }));
         setCollections(collectionsData);
+        setLoadingCollections(false);
       } else {
         console.log('No collections found.');
         setCollections([]);
+        setLoadingCollections(false);
       }
     } catch (error) {
       console.error('Error fetching collections:', error);
       Alert.alert('Error', 'An error occurred while fetching collections.');
+      setLoadingCollections(false);
     }
   };
 
@@ -555,9 +689,170 @@ const ProductUpload = ({navigation, route}) => {
   };
 
   useEffect(() => {
+    if (route.params?.prefillData) {
+      const { title, price, description, productImage, uploadedImage } = route.params.prefillData;
+      setProductName(title);
+      // Ensure price is a clean number without currency symbols
+      setPrice(price ? price.toString().replace(/[^0-9.]/g, '') : '');
+      setDescription(description);
+      
+      // Handle the uploaded/captured image
+      if (uploadedImage) {
+        const uploadedImageObj = {
+          uri: uploadedImage,
+          type: 'image/jpeg',
+          name: 'uploaded_image.jpg'
+        };
+        setImages([uploadedImageObj]);
+      }
+      
+      // Handle the product image from search results
+      if (productImage) {
+        const productImageObj = {
+          uri: productImage,
+          type: 'image/jpeg',
+          name: 'product_image.jpg'
+        };
+        // Add product image if we don't have an uploaded image
+        if (!uploadedImage) {
+          setImages([productImageObj]);
+        }
+      }
+    }
+  }, [route.params?.prefillData]);
+
+  const formatTitle = (title) => {
+    if (!title) return '';
+    
+    // Split into chunks of 25 characters, maintaining word boundaries
+    const words = title.split(' ');
+    let lines = [];
+    let currentLine = '';
+    
+    for (const word of words) {
+      if (currentLine.length + word.length + 1 <= 25) {
+        currentLine += (currentLine.length ? ' ' : '') + word;
+      } else {
+        if (currentLine.length) lines.push(currentLine);
+        currentLine = word;
+      }
+    }
+    if (currentLine.length) lines.push(currentLine);
+    
+    return lines.join('\n');
+  };
+
+  const handleProductSelect = (product) => {
+    if (route.params?.returnToUpload) {
+      navigation.navigate('ProductUpload', {
+        prefillData: {
+          title: formatTitle(product.title),
+          price: product.price?.value.toString().replace(/[^0-9.]/g, '') || '',
+          description: product.description || '',
+          productImage: product.image || null,
+          uploadedImage: route.params?.imageUri,
+        }
+      });
+    }
+  };
+
+  const renderImagePreview = () => {
+    if (images.length === 0) {
+      return (
+        <View style={styles.placeholderImage}>
+          <Text style={styles.placeholderText}>No images selected</Text>
+        </View>
+      );
+    }
+
+    return (
+      <FlatList
+        data={images}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        renderItem={({ item, index }) => (
+          <View style={styles.imageContainer}>
+            <Image
+              source={{ uri: item.uri }}
+              style={styles.selectedImage}
+              resizeMode="contain"
+            />
+            <TouchableOpacity
+              style={styles.removeButton}
+              onPress={() => {
+                const newImages = [...images];
+                newImages.splice(index, 1);
+                setImages(newImages);
+              }}>
+              <Text style={styles.removeButtonText}>×</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        keyExtractor={(item, index) => index.toString()}
+        ListFooterComponent={
+          <TouchableOpacity
+            style={styles.addMoreButton}
+            onPress={() => setShowImageOptions(true)}>
+            <Text style={styles.addMoreText}>+</Text>
+          </TouchableOpacity>
+        }
+      />
+    );
+  };
+
+  useEffect(() => {
     fetchSpaces();
     fetchCollections();
   }, []);
+
+  const SkeletonCard = () => {
+    const animatedValue = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+      const animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(animatedValue, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(animatedValue, {
+            toValue: 0,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      animation.start();
+      return () => animation.stop();
+    }, []);
+
+    const opacity = animatedValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.3, 0.7],
+    });
+
+    return (
+      <View style={styles.collectionSkeletonCard}>
+        <Animated.View style={[styles.collectionSkeletonImage, { opacity }]} />
+        <View style={styles.collectionSkeletonContent}>
+          <Animated.View style={[styles.collectionSkeletonText, { opacity }]} />
+        </View>
+      </View>
+    );
+  };
+
+  const renderSkeleton = () => (
+    <ScrollView 
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+    >
+      <SkeletonCard />
+      <SkeletonCard />
+      <SkeletonCard />
+    </ScrollView>
+  );
+
   return (
     <View style={{flex: 1}}>
       <ScrollView style={styles.container}>
@@ -565,7 +860,7 @@ const ProductUpload = ({navigation, route}) => {
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Image
-              source={require('../assets/images/back-arrow.png')}
+              source={require('../assets/images/arrow_back.png')}
               style={styles.backIcon}
             />
           </TouchableOpacity>
@@ -573,55 +868,10 @@ const ProductUpload = ({navigation, route}) => {
           <View style={{width: 24}} />
         </View>
 
-        <TouchableOpacity 
-          style={styles.searchOnlineButton}
-          onPress={() => navigation.navigate('OnlineProductSearch')}
-        >
-          <Text style={styles.searchOnlineButtonText}>
-            Search Online Products
-          </Text>
-        </TouchableOpacity>
-
         {/* Image Upload Section */}
         <View style={styles.uploadSection}>
           <View style={styles.imageSection}>
-            {images.length > 0 ? (
-              <FlatList
-                data={images}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                renderItem={({item, index}) => (
-                  <View style={styles.imageContainer}>
-                    <Image
-                      source={{uri: item.uri}}
-                      style={styles.selectedImage}
-                      resizeMode="cover"
-                    />
-                    <TouchableOpacity
-                      style={styles.removeButton}
-                      onPress={() => {
-                        const newImages = [...images];
-                        newImages.splice(index, 1);
-                        setImages(newImages);
-                      }}>
-                      <Text style={styles.removeButtonText}>×</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-                keyExtractor={(item, index) => index.toString()}
-                ListFooterComponent={
-                  <TouchableOpacity
-                    style={styles.addMoreButton}
-                    onPress={() => setShowImageOptions(true)}>
-                    <Text style={styles.addMoreText}>+</Text>
-                  </TouchableOpacity>
-                }
-              />
-            ) : (
-              <View style={styles.placeholderImage}>
-                <Text style={styles.placeholderText}>No images selected</Text>
-              </View>
-            )}
+            {renderImagePreview()}
           </View>
 
           <View style={styles.buttonContainer}>
@@ -632,7 +882,7 @@ const ProductUpload = ({navigation, route}) => {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.uploadOptionButton, styles.galleryButton]}
-              onPress={handleImagePick}>
+              onPress={handleAddImage}>
               <Text style={styles.uploadOptionText}>Choose from Gallery</Text>
             </TouchableOpacity>
           </View>
@@ -642,10 +892,12 @@ const ProductUpload = ({navigation, route}) => {
         <View style={styles.formContainer}>
           <Text style={styles.label}>Product Name</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, styles.titleInput]}
             value={productName}
             onChangeText={setProductName}
             placeholder="Enter product name"
+            multiline
+            numberOfLines={2}
           />
 
           <Text style={styles.label}>Description</Text>
@@ -720,35 +972,44 @@ const ProductUpload = ({navigation, route}) => {
           {/* Collections Section */}
           <View style={styles.spacesSection}>
             <Text style={styles.label}>Collections (Required)</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.spacesList}>
-              {collections.map(collection => (
-                <TouchableOpacity
-                  key={collection.id}
-                  style={[
-                    styles.spaceItem,
-                    selectedCollections.some(c => c.id === collection.id) &&
-                      styles.selectedSpaceItem,
-                  ]}
-                  onPress={() => toggleCollection(collection)}>
-                  <Text
+            {loadingCollections ? (
+              renderSkeleton()
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.spacesList}>
+                {collections.map(collection => (
+                  <TouchableOpacity
+                    key={collection.id}
                     style={[
-                      styles.spaceText,
+                      styles.collectionItem,
                       selectedCollections.some(c => c.id === collection.id) &&
-                        styles.selectedSpaceText,
-                    ]}>
-                    {collection.name}
-                  </Text>
+                        styles.selectedCollectionItem,
+                    ]}
+                    onPress={() => toggleCollection(collection)}>
+                    <Image
+                      source={{ uri: collection.image }}
+                      style={styles.collectionItemImage}
+                      onError={(e) => console.log('Collection image load error:', e.nativeEvent)}
+                    />
+                    <Text
+                      style={[
+                        styles.collectionText,
+                        selectedCollections.some(c => c.id === collection.id) &&
+                          styles.selectedCollectionText,
+                      ]}>
+                      {collection.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={styles.addSpaceButton}
+                  onPress={() => setShowCollectionInput(true)}>
+                  <Text style={styles.addSpaceText}>+</Text>
                 </TouchableOpacity>
-              ))}
-              <TouchableOpacity
-                style={styles.addSpaceButton}
-                onPress={() => setShowCollectionInput(true)}>
-                <Text style={styles.addSpaceText}>+</Text>
-              </TouchableOpacity>
-            </ScrollView>
+              </ScrollView>
+            )}
           </View>
 
           <TouchableOpacity style={styles.uploadButton} onPress={handleUpload}>
@@ -774,7 +1035,7 @@ const ProductUpload = ({navigation, route}) => {
             <View style={styles.modalDivider} />
             <TouchableOpacity
               style={styles.modalOption}
-              onPress={handleImagePick}>
+              onPress={handleAddImage}>
               <Text style={styles.modalOptionText}>Choose from Gallery</Text>
             </TouchableOpacity>
             <View style={styles.modalDivider} />
@@ -996,7 +1257,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   imageContainer: {
-    width: 180,
+    width: 200,
     height: 200,
     marginRight: 10,
     borderRadius: 8,
@@ -1018,7 +1279,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   addMoreButton: {
-    width: 180,
+    width: 200,
     height: 200,
     backgroundColor: '#fff',
     borderRadius: 8,
@@ -1052,7 +1313,7 @@ const styles = StyleSheet.create({
   },
   placeholderImage: {
     width: '100%',
-    height: 200,
+    height: 150,
     backgroundColor: '#e1e1e1',
     borderRadius: 8,
     justifyContent: 'center',
@@ -1101,6 +1362,11 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     fontSize: 16,
     color: '#000',
+  },
+  titleInput: {
+    minHeight: 60,
+    textAlignVertical: 'top',
+    lineHeight: 24,
   },
   textArea: {
     height: 100,
@@ -1326,6 +1592,109 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  imagePreviewContainer: {
+    width: '100%',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  imagePreviewWrapper: {
+    width: 100,
+    height: 100,
+    position: 'relative',
+    marginRight: 10,
+  },
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  imagePlaceholder: {
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    color: '#666',
+    fontSize: 16,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    right: 10,
+    top: 10,
+    backgroundColor: 'rgba(255, 0, 0, 0.8)',
+    borderRadius: 20,
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
+  },
+  removeImageText: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  collectionSkeletonCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 16,
+    padding: 12,
+    flexDirection: 'row',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  collectionSkeletonImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#E1E1E1',
+  },
+  collectionSkeletonContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  collectionSkeletonText: {
+    height: 20,
+    width: '60%',
+    backgroundColor: '#E1E1E1',
+    borderRadius: 4,
+  },
+  collectionItem: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  selectedCollectionItem: {
+    backgroundColor: '#8b4ae2',
+    borderColor: '#8b4ae2',
+  },
+  collectionText: {
+    color: '#666',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  selectedCollectionText: {
+    color: '#fff',
+  },
+  collectionItemImage: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginRight: 8,
   },
 });
 

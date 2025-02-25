@@ -8,15 +8,16 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  SafeAreaView,
 } from 'react-native';
 import * as ImagePicker from 'react-native-image-picker';
-import axios from 'axios';
 
 const BASE_URL = 'http://13.49.68.11:3000';
 
 const OnlineProductSearchScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
+  const [error, setError] = useState(null);
 
   // Auto-search when image data is provided
   useEffect(() => {
@@ -32,73 +33,73 @@ const OnlineProductSearchScreen = ({ navigation, route }) => {
   const searchProducts = async (imageFile) => {
     try {
       setLoading(true);
+      setError(null);
+      console.log('Starting product search with image:', imageFile);
       
-      // Create form data
       const formData = new FormData();
-      
-      // If we have a file path, create a file object
-      const file = {
+      formData.append('search_image', {
         uri: imageFile.uri,
         type: 'image/jpeg',
         name: 'search_image.jpg'
-      };
-      
-      formData.append('search_image', file);
-
-      console.log('Making API request to:', `${BASE_URL}/search-product`);
-      console.log('Image file details:', {
-        uri: file.uri,
-        type: file.type,
-        name: file.name
       });
 
-      const config = {
+      console.log('Making API request to:', `${BASE_URL}/search-product`);
+      
+      const response = await fetch(`${BASE_URL}/search-product`, {
+        method: 'POST',
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'multipart/form-data',
         },
-        timeout: 30000, // 30 second timeout
-      };
-
-      console.log('Request config:', config);
-
-      const searchResponse = await axios.post(
-        `${BASE_URL}/search-product`,
-        formData,
-        config
-      );
-
-      console.log('Search Response:', {
-        status: searchResponse.status,
-        data: searchResponse.data
+        body: formData,
+        timeout: 30000 // 30 second timeout
       });
 
-      if (searchResponse.data && Array.isArray(searchResponse.data.data)) {
-        setSearchResults(searchResponse.data.data);
+      console.log('Response status:', response.status);
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse response:', parseError);
+        throw new Error('Invalid response format from server');
+      }
+
+      console.log('Parsed response data:', responseData);
+
+      if (responseData && Array.isArray(responseData.data)) {
+        if (responseData.data.length === 0) {
+          setError('No matching products found');
+        } else {
+          setSearchResults(responseData.data);
+        }
       } else {
-        console.log('Invalid response format:', searchResponse.data);
-        setSearchResults([]);
-        Alert.alert('No Results', 'No matching products found');
+        console.error('Invalid response structure:', responseData);
+        throw new Error('Invalid response format from server');
       }
     } catch (error) {
-      console.error('Search error details:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        config: error.config,
-        stack: error.stack
-      });
+      console.error('Search error:', error.message);
+      console.error('Error stack:', error.stack);
 
-      let errorMessage = 'Failed to search products.';
+      let errorMessage = 'Failed to search products. ';
       
-      if (error.message.includes('Network Error')) {
-        errorMessage = 'Network error. Please check your internet connection.';
-      } else if (error.response?.status === 413) {
-        errorMessage = 'Image file is too large. Please choose a smaller image.';
-      } else if (error.code === 'ECONNABORTED') {
-        errorMessage = 'Request timed out. Please try again.';
+      if (!navigator.onLine) {
+        errorMessage += 'Please check your internet connection.';
+      } else if (error.message.includes('timeout')) {
+        errorMessage += 'Request timed out. Please try again.';
+      } else if (error.message.includes('413')) {
+        errorMessage += 'Image file is too large. Please choose a smaller image.';
+      } else {
+        errorMessage += error.message;
       }
 
+      setError(errorMessage);
       Alert.alert('Error', errorMessage);
     } finally {
       setLoading(false);
@@ -147,160 +148,235 @@ const OnlineProductSearchScreen = ({ navigation, route }) => {
 
   const handleProductSelect = (product) => {
     if (route.params?.returnToUpload) {
-      // Navigate back to product upload with prefilled data
+      // Remove $ symbol and any other non-numeric characters except decimal point
+      const priceValue = product.price?.value 
+        ? product.price.value.toString().replace(/[^0-9.]/g, '')
+        : '';
+
       navigation.navigate('ProductUpload', {
         prefillData: {
           title: product.title || '',
-          price: product.price || '',
+          price: priceValue,
           description: product.description || '',
+          productImage: product.image || null,
+          uploadedImage: route.params?.imageUri // Pass the uploaded image back
         }
       });
     }
   };
 
-  const renderProduct = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.productCard}
-      onPress={() => handleProductSelect(item)}
-    >
-      {item.image && (
-        <Image 
-          source={{ uri: item.image }} 
-          style={styles.productImage}
-          resizeMode="cover"
-        />
-      )}
-      <View style={styles.productInfo}>
-        <Text style={styles.productTitle} numberOfLines={2}>
-          {item.title}
-        </Text>
-        <Text style={styles.productPrice}>
-          ₹{item.price || 'N/A'}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const renderProduct = ({ item }) => {
+    // Get thumbnail URL or fallback to main image
+    const imageUrl = item.thumbnail || item.image;
+    
+    return (
+      <TouchableOpacity 
+        style={styles.productCard}
+        onPress={() => handleProductSelect(item)}
+      >
+        <View style={styles.imageContainer}>
+          <Image 
+            source={imageUrl ? { uri: imageUrl } : require('../assets/images/placeholder.png')}
+            style={styles.productImage}
+            resizeMode="cover"
+            onError={() => {
+              console.log('Failed to load image:', imageUrl);
+            }}
+          />
+        </View>
+        <View style={styles.productInfo}>
+          <Text 
+            style={styles.productTitle} 
+            numberOfLines={2}
+            ellipsizeMode="tail"
+          >
+            {item.title}
+          </Text>
+          <View style={styles.priceSourceContainer}>
+            <Text style={styles.productPrice}>
+              ${item.price?.value?.toString().replace(/[^0-9.]/g, '') || 'N/A'}
+            </Text>
+            <Text style={styles.productSource}>
+              {item.source || 'Unknown'}
+            </Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backButtonText}>←</Text>
+          <Image 
+            source={require('../assets/images/arrow_back.png')} 
+            style={styles.backButtonImage} 
+          />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Similar Products</Text>
       </View>
 
-      {!route.params?.imageUri && (
-        <TouchableOpacity 
-          style={styles.uploadButton}
-          onPress={handleImageUpload}
-        >
-          <Text style={styles.uploadButtonText}>
-            Upload Image to Search
-          </Text>
-        </TouchableOpacity>
-      )}
-
       {loading ? (
-        <ActivityIndicator size="large" color="#6B46C1" style={styles.loader} />
+        <FlatList
+          data={[1,2,3,4,6]}
+          renderItem={() => (
+            <View style={styles.productCard}>
+              <View style={[styles.imageContainer, styles.skeleton]} />
+              <View style={styles.productInfo}>
+                <View style={[styles.skeleton, { height: 36, marginBottom: 8 }]} />
+                <View style={styles.priceSourceContainer}>
+                  <View style={[styles.skeleton, { height: 16, width: 60 }]} />
+                  <View style={[styles.skeleton, { height: 14, width: 80 }]} />
+                </View>
+              </View>
+            </View>
+          )}
+          keyExtractor={(item) => item.toString()}
+          numColumns={2}
+          columnWrapperStyle={styles.row}
+          contentContainerStyle={styles.listContainer}
+        />
       ) : (
         <FlatList
           data={searchResults}
           renderItem={renderProduct}
-          keyExtractor={(item, index) => item.id?.toString() || index.toString()}
-          contentContainerStyle={styles.productList}
+          keyExtractor={(item, index) => item.id || index.toString()}
           numColumns={2}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>
-              {route.params?.imageUri ? 'Searching for similar products...' : 'Upload an image to search for similar products'}
-            </Text>
-          }
+          columnWrapperStyle={styles.row}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
         />
       )}
-    </View>
+      {error && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F4F4F4',
+    backgroundColor: '#fff',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   backButton: {
-    marginRight: 16,
+    padding: 8,
+    marginRight: 8,
   },
-  backButtonText: {
-    fontSize: 24,
-    color: '#6B46C1',
+  backButtonImage: {
+    width: 24,
+    height: 24,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-  },
-  uploadButton: {
-    margin: 16,
-    padding: 16,
-    backgroundColor: '#6B46C1',
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  uploadButtonText: {
-    color: '#fff',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
+    color: '#000',
   },
-  productList: {
+  listContainer: {
     padding: 8,
   },
+  row: {
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
   productCard: {
-    flex: 1,
-    margin: 8,
+    width: '48%',
     backgroundColor: '#fff',
     borderRadius: 8,
-    overflow: 'hidden',
     elevation: 2,
-    maxWidth: '47%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  imageContainer: {
+    width: '100%',
+    height: 150,
+    backgroundColor: '#f5f5f5',
+    overflow: 'hidden',
   },
   productImage: {
     width: '100%',
-    height: 150,
+    height: '100%',
+    backgroundColor: '#f5f5f5',
   },
   productInfo: {
-    padding: 12,
+    padding: 8,
   },
   productTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#1A1A1A',
-    marginBottom: 4,
+    marginBottom: 8,
+    lineHeight: 18,
+    minHeight: 36,
   },
   productPrice: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
-    color: '#6B46C1',
+    color: '#2E7D32',
+  },
+  skeleton: {
+    backgroundColor: '#E1E9EE',
+    borderRadius: 4,
+  },
+  priceSourceContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  productSource: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
   },
   loader: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  emptyText: {
+  errorContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  errorText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
     textAlign: 'center',
-    marginTop: 32,
+  },
+  placeholderOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.1)',
+  },
+  placeholderText: {
     color: '#666',
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 
