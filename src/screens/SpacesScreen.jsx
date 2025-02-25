@@ -26,6 +26,8 @@ const SpacesScreen = ({ navigation }) => {
       setLoading(true);
       const token = await AsyncStorage.getItem('accessToken');
       
+      console.log('Fetching spaces with token:', token);
+
       const response = await axios.get(`${BASE_URL}/spaces/user`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -33,33 +35,32 @@ const SpacesScreen = ({ navigation }) => {
         },
       });
 
-      console.log('Spaces Response:', JSON.stringify(response.data, null, 2));
+      console.log('Raw Spaces Response:', JSON.stringify(response.data, null, 2));
 
       if (response.data && Array.isArray(response.data.data)) {
         const spacesData = response.data.data.map(space => ({
           id: space.id || space.space_id,
-          name: space.name || space.space_name || 'Unnamed Space',
-          image: space.space_image || require('../assets/images/Space_default.jpg'),
-          productCount: space.product_count || 0
+          name: space.space_name || space.name || 'Unnamed Space',
+          description: space.description || '',
+          space_image: space.space_image || null,
+          total_products: space.total_products || 0,
+          created_at: space.created_at,
         }));
 
-        setSpaces(spacesData);
-        setLoading(false);
-      } else {
-        throw new Error('Invalid response structure');
-      }
-    } catch (error) {
-      console.error('Error fetching spaces:', error);
+        const sortedSpaces = spacesData.sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at)
+        );
 
-      Alert.alert(
-        'Error', 
-        'Could not fetch spaces. Please try again.',
-        [{ 
-          text: 'Retry', 
-          onPress: fetchSpaces 
-        }]
-      );
-      
+        console.log('Processed Spaces:', sortedSpaces);
+        setSpaces(sortedSpaces);
+      } else {
+        console.log('No spaces found or invalid response structure');
+        setSpaces([]);
+      }
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching spaces:', error.response?.data || error);
+      setSpaces([]);
       setLoading(false);
     }
   }, []);
@@ -122,16 +123,24 @@ const SpacesScreen = ({ navigation }) => {
                 })}
               >
                 <Image 
-                  source={typeof space.image === 'string' ? { uri: space.image } : space.image}
-                  style={styles.spaceCardImage} 
+                  source={space.space_image ? { uri: space.space_image } : require('../assets/images/Space_default.jpg')}
+                  style={styles.spaceImage} 
                   resizeMode="cover"
+                  onError={(e) => {
+                    console.log('Space image load error:', {
+                      spaceId: space.id,
+                      spaceName: space.name,
+                      space_image: space.space_image,
+                      error: e.nativeEvent
+                    });
+                  }}
                 />
-                <View style={styles.spaceCardContent}>
-                  <Text style={styles.spaceCardTitle} numberOfLines={1}>
+                <View style={styles.spaceOverlay}>
+                  <Text style={styles.spaceName} numberOfLines={1}>
                     {space.name}
                   </Text>
-                  <Text style={styles.spaceCardSubtitle}>
-                    {space.productCount} Products
+                  <Text style={styles.itemCount}>
+                    {space.total_products || 0} Items
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -178,19 +187,19 @@ const styles = StyleSheet.create({
     elevation: 3,
     overflow: 'hidden',
   },
-  spaceCardImage: {
+  spaceImage: {
     width: '100%',
     height: 150,
   },
-  spaceCardContent: {
+  spaceOverlay: {
     padding: 10,
   },
-  spaceCardTitle: {
+  spaceName: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
   },
-  spaceCardSubtitle: {
+  itemCount: {
     fontSize: 14,
     color: '#666',
     marginTop: 5,

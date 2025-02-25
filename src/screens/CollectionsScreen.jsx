@@ -12,6 +12,7 @@ import {
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBar from '../components/BottomNavBar';
+import SkeletonLoader from '../components/SkeletonLoader';
 
 const BASE_URL = 'http://13.49.68.11:3000';
 
@@ -77,11 +78,28 @@ const CollectionsScreen = ({ navigation }) => {
     fetchCollections();
   }, [fetchCollections]);
 
+  const renderSkeletonLoaders = () => (
+    <View style={styles.collectionGrid}>
+      {[1, 2, 3, 4].map(key => (
+        <View key={key} style={styles.collectionCard}>
+          <SkeletonLoader width="100%" height={150} />
+          <View style={styles.collectionInfo}>
+            <SkeletonLoader width="80%" height={20} style={{marginBottom: 8}} />
+            <SkeletonLoader width="40%" height={16} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+
   // Render loading state
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading Collections...</Text>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Collections</Text>
+        </View>
+        {renderSkeletonLoaders()}
       </View>
     );
   }
@@ -102,8 +120,8 @@ const CollectionsScreen = ({ navigation }) => {
         </View>
 
         {collections.length === 0 ? (
-          <View style={styles.emptyStateContainer}>
-            <Text style={styles.emptyStateText}>No collections found</Text>
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>No collections found</Text>
             <TouchableOpacity 
               style={styles.createCollectionButton}
               onPress={() => navigation.navigate('CreateCollection')}
@@ -112,28 +130,31 @@ const CollectionsScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.collectionsContainer}>
+          <View style={styles.collectionGrid}>
             {collections.map(collection => (
-              <TouchableOpacity 
-                key={collection.id} 
+              <TouchableOpacity
+                key={collection.id}
                 style={styles.collectionCard}
-                onPress={() => navigation.navigate('IndividualSpace', { 
-                  spaceId: collection.spaceId,
-                  collectionId: collection.id,
-                  collectionName: collection.name
-                })}
-              >
-                <Image 
-                  source={typeof collection.image === 'string' ? { uri: collection.image } : collection.image}
-                  style={styles.collectionCardImage} 
-                  resizeMode="cover"
+                onPress={() =>
+                  navigation.navigate('IndividualCollection', {
+                    collectionId: collection.id,
+                    collectionName: collection.name,
+                  })
+                }>
+                <Image
+                  source={
+                    typeof collection.image === 'string'
+                      ? {uri: collection.image}
+                      : collection.image
+                  }
+                  style={styles.collectionImage}
                 />
-                <View style={styles.collectionCardContent}>
-                  <Text style={styles.collectionCardTitle} numberOfLines={1}>
+                <View style={styles.collectionInfo}>
+                  <Text style={styles.collectionName} numberOfLines={1}>
                     {collection.name}
                   </Text>
-                  <Text style={styles.collectionCardSubtitle}>
-                    {collection.productCount} Products
+                  <Text style={styles.productCount}>
+                    {collection.productCount} {collection.productCount === 1 ? 'Product' : 'Products'}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -150,80 +171,70 @@ const CollectionsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F4F4F4',
+    backgroundColor: '#fff',
   },
   header: {
-    backgroundColor: '#6B46C1',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e1e1e1',
   },
   headerTitle: {
-    color: 'white',
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
+    color: '#333',
   },
-  collectionsContainer: {
-    padding: 20,
+  collectionGrid: {
+    padding: 16,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
   collectionCard: {
-    width: '48%', // Slightly less than half to allow for spacing
-    backgroundColor: 'white',
-    borderRadius: 10,
-    marginBottom: 15,
+    width: '48%',
+    marginBottom: 16,
+    borderRadius: 8,
+    backgroundColor: '#fff',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
     overflow: 'hidden',
   },
-  collectionCardImage: {
+  collectionImage: {
     width: '100%',
     height: 150,
+    resizeMode: 'cover',
   },
-  collectionCardContent: {
-    padding: 10,
+  collectionInfo: {
+    padding: 12,
   },
-  collectionCardTitle: {
+  collectionName: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#333',
+    marginBottom: 4,
   },
-  collectionCardSubtitle: {
+  productCount: {
     fontSize: 14,
     color: '#666',
-    marginTop: 5,
   },
-  loadingText: {
-    fontSize: 18,
-    textAlign: 'center',
-    marginTop: 20,
-    color: '#666',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  emptyStateContainer: {
+  errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
-  emptyStateText: {
-    fontSize: 18,
-    color: '#666',
-    marginBottom: 20,
-  },
-  createCollectionButton: {
-    backgroundColor: '#6B46C1',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-  },
-  createCollectionButtonText: {
-    color: 'white',
+  errorText: {
     fontSize: 16,
-    fontWeight: 'bold',
+    color: '#666',
+    textAlign: 'center',
   },
 });
 

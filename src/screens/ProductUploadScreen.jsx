@@ -214,54 +214,114 @@ const ProductUpload = ({navigation}) => {
     }
   };
 
-  const toggleCollection = collection => {
-    setSelectedCollections(prev => {
-      const isSelected = prev.some(c => c.id === collection.id);
-      if (isSelected) {
-        return prev.filter(c => c.id !== collection.id);
-      } else {
-        return [...prev, collection];
-      }
-    });
-  };
-
-  const handleCreateSpace = async () => {
-    console.log('handleCreateSpace');
-    if (!newSpaceName.trim()) {
-      Alert.alert('Error', 'Please enter a space name');
+  const handleCreateCollection = async () => {
+    if (!newCollectionName.trim()) {
+      Alert.alert('Error', 'Please enter a collection name');
       return;
     }
 
     try {
       const token = await AsyncStorage.getItem('accessToken');
-      console.log({token});
-      const spaceResponse = await axios.post(
-        `${BASE_URL}/spaces`,
-        {
-          space_name: newSpaceName.trim(),
-          description: newSpaceDescription.trim() || newSpaceName.trim(),
-          space_image: newSpaceImage ? newSpaceImage.uri : null,
-          total_worth: 0,
-          items_count: 0,
-        },
+      
+      // Create form data for the collection
+      const formData = new FormData();
+      formData.append('collection_name', newCollectionName.trim());
+      formData.append('description', newCollectionDescription.trim() || newCollectionName.trim());
+      
+      // Add collection image if available
+      if (newCollectionImage) {
+        formData.append('collection_image', {
+          uri: newCollectionImage.uri,
+          type: newCollectionImage.type || 'image/jpeg',
+          name: 'collection_image.jpg',
+        });
+      }
+
+      const response = await axios.post(
+        `${BASE_URL}/collections`,
+        formData,
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
+            'Content-Type': 'multipart/form-data',
           },
         },
       );
 
-      if (spaceResponse.data) {
-        console.log({data: spaceResponse.data});
-        const spaceResponsedata = spaceResponse.data;
-        const newSpace = {
-          id: spaceResponsedata.data.id || spaceResponsedata.data.space_id,
-          title:
-            spaceResponsedata.data.space_name || spaceResponsedata.data.name,
-          description: spaceResponsedata.data.description,
-          image: spaceResponsedata.data.space_image,
+      if (response.data) {
+        const newCollection = {
+          id: response.data.data.id,
+          name: response.data.data.collection_name,
+          description: response.data.data.description,
+          image: response.data.data.collection_image,
         };
+
+        setCollections(prevCollections => [newCollection, ...prevCollections]);
+        setSelectedCollections(prev => [...prev, newCollection]);
+        setShowCollectionInput(false);
+        setNewCollectionName('');
+        setNewCollectionDescription('');
+        setNewCollectionImage(null);
+
+        Alert.alert('Success', 'Collection created successfully!');
+      }
+    } catch (error) {
+      console.error('Error creating collection:', error);
+      Alert.alert(
+        'Error',
+        error.response?.data?.message || 'Failed to create collection'
+      );
+    }
+  };
+
+  const handleCreateSpace = async () => {
+    if (!newSpaceName.trim()) {
+      Alert.alert('Error', 'Please enter a space name');
+      return;
+    }
+
+    if (!newSpaceImage) {
+      Alert.alert('Error', 'Please select a space image');
+      return;
+    }
+
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      
+      // Create form data for the space
+      const formData = new FormData();
+      formData.append('space_name', newSpaceName.trim());
+      formData.append('description', newSpaceDescription.trim() || newSpaceName.trim());
+      
+      // Add space image (mandatory)
+      formData.append('space_image', {
+        uri: newSpaceImage.uri,
+        type: newSpaceImage.type || 'image/jpeg',
+        name: 'space_image.jpg',
+      });
+
+      const response = await axios.post(
+        `${BASE_URL}/spaces`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        },
+      );
+
+      if (response.data) {
+        console.log('Space creation response:', response.data);
+        
+        const newSpace = {
+          id: response.data.data.id,
+          name: response.data.data.space_name || newSpaceName.trim(),
+          description: response.data.data.description,
+          image: response.data.data.space_image,
+        };
+
+        console.log('Created new space:', newSpace);
 
         setSpaces(prevSpaces => [newSpace, ...prevSpaces]);
         setSelectedSpace(newSpace);
@@ -269,14 +329,15 @@ const ProductUpload = ({navigation}) => {
         setNewSpaceName('');
         setNewSpaceDescription('');
         setNewSpaceImage(null);
-      } else {
-        Alert.alert('Error', 'Failed to create space. Please try again.');
+
+        Alert.alert('Success', 'Space created successfully!');
       }
     } catch (error) {
-      console.error('Error creating space:', error);
-      Alert.alert('Error', 'An error occurred while creating the space.');
-    } finally {
-      //   setIsLoading(false);
+      console.error('Error creating space:', error.response?.data || error);
+      Alert.alert(
+        'Error',
+        error.response?.data?.message || 'Failed to create space'
+      );
     }
   };
 
@@ -297,17 +358,17 @@ const ProductUpload = ({navigation}) => {
         return;
       }
 
-      if (!selectedSpace) {
+      if (!selectedSpace?.id) {
         Alert.alert('Error', 'Please select a space');
         return;
       }
 
-      if (selectedCollections.length === 0) {
+      if (!selectedCollections?.length) {
         Alert.alert('Error', 'Please select at least one collection');
         return;
       }
 
-      if (images.length === 0) {
+      if (!images?.length) {
         Alert.alert('Error', 'Please add at least one image');
         return;
       }
@@ -323,18 +384,22 @@ const ProductUpload = ({navigation}) => {
       formData.append('price', price.toString());
       formData.append('space_id', selectedSpace.id.toString());
 
-      // Append collection IDs
-      selectedCollections.forEach(collection => {
-        formData.append('collection_ids[]', collection.id.toString());
+      // Append collection IDs as collection_id[0], collection_id[1], etc.
+      selectedCollections.forEach((collection, index) => {
+        if (collection?.id) {
+          formData.append(`collection_id[${index}]`, collection.id.toString());
+        }
       });
 
-      // Append all images
+      // Append all images as 'image'
       images.forEach((image, index) => {
-        formData.append('image', {
-          uri: image.uri,
-          type: image.type || 'image/jpeg',
-          name: `product_image_${index}.jpg`,
-        });
+        if (image?.uri) {
+          formData.append('image', {
+            uri: image.uri,
+            type: image.type || 'image/jpeg',
+            name: `image_${index}.jpg`,
+          });
+        }
       });
 
       console.log('Uploading product with data:', {
@@ -342,7 +407,7 @@ const ProductUpload = ({navigation}) => {
         description: description.trim(),
         price: price,
         space_id: selectedSpace.id,
-        collection_ids: selectedCollections.map(c => c.id),
+        collection_ids: selectedCollections.map(c => c?.id).filter(Boolean),
         number_of_images: images.length,
       });
 
@@ -400,33 +465,22 @@ const ProductUpload = ({navigation}) => {
         },
       });
 
-      console.log(
-        'Spaces API Response:',
-        JSON.stringify(response.data, null, 2),
-      );
-
       if (response.data && Array.isArray(response.data.data)) {
         const spacesData = response.data.data.map(space => ({
           id: space.id || space.space_id,
-          name:
-            space.space_name || space.name || space.title || 'Unnamed Space',
+          name: space.space_name || space.name || 'Unnamed Space',
           description: space.description || '',
-          image: space.space_image,
+          space_image: space.space_image || null,
+          total_products: space.total_products || 0,
+          created_at: space.created_at,
         }));
 
-        console.log('Processed Spaces:', JSON.stringify(spacesData, null, 2));
-
+        console.log('Processed Spaces:', spacesData);
         setSpaces(spacesData);
-      } else {
-        console.log('No spaces found or invalid response structure');
-        setSpaces([]);
       }
     } catch (error) {
-      console.error(
-        'Error fetching spaces:',
-        error.response ? error.response.data : error,
-      );
-      Alert.alert('Error', 'An error occurred while fetching spaces.');
+      console.error('Error fetching spaces:', error.response?.data || error);
+      setSpaces([]);
     }
   };
   const fetchCollections = async () => {
@@ -458,6 +512,19 @@ const ProductUpload = ({navigation}) => {
       console.error('Error fetching collections:', error);
       Alert.alert('Error', 'An error occurred while fetching collections.');
     }
+  };
+
+  const toggleCollection = collection => {
+    if (!collection?.id) return;
+    
+    setSelectedCollections(prev => {
+      const isSelected = prev.some(c => c.id === collection.id);
+      if (isSelected) {
+        return prev.filter(c => c.id !== collection.id);
+      } else {
+        return [...prev, collection];
+      }
+    });
   };
 
   useEffect(() => {
@@ -578,14 +645,32 @@ const ProductUpload = ({navigation}) => {
                     selectedSpace?.id === space.id && styles.selectedSpaceItem,
                   ]}
                   onPress={() => setSelectedSpace(space)}>
-                  <Text
-                    style={[
-                      styles.spaceText,
-                      selectedSpace?.id === space.id &&
-                        styles.selectedSpaceText,
-                    ]}>
-                    {space.name}
-                  </Text>
+                  <View style={styles.spaceItemContent}>
+                    {space.space_image ? (
+                      <Image
+                        source={{ uri: space.space_image }}
+                        style={styles.spaceItemImage}
+                        onError={(e) => console.log('Space image load error:', e.nativeEvent)}
+                      />
+                    ) : (
+                      <Image
+                        source={require('../assets/images/Space_default.jpg')}
+                        style={styles.spaceItemImage}
+                      />
+                    )}
+                    <View style={styles.spaceItemTextContainer}>
+                      <Text
+                        style={[
+                          styles.spaceText,
+                          selectedSpace?.id === space.id && styles.selectedSpaceText,
+                        ]}>
+                        {space.name}
+                      </Text>
+                      <Text style={styles.spaceItemCount}>
+                        {space.total_products} {space.total_products === 1 ? 'Item' : 'Items'}
+                      </Text>
+                    </View>
+                  </View>
                 </TouchableOpacity>
               ))}
               <TouchableOpacity
@@ -598,7 +683,7 @@ const ProductUpload = ({navigation}) => {
 
           {/* Collections Section */}
           <View style={styles.spacesSection}>
-            <Text style={styles.label}>Collections (Select multiple)</Text>
+            <Text style={styles.label}>Collections (Required)</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -672,11 +757,14 @@ const ProductUpload = ({navigation}) => {
       <Modal visible={showSpaceInput} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, {width: '90%'}]}>
-            <Text style={styles.modalTitle}>Add New Space</Text>
+            <Text style={styles.modalTitle}>Create New Space</Text>
 
             {/* Space Image */}
             <TouchableOpacity
-              style={styles.spaceImageContainer}
+              style={[
+                styles.imagePickerButton,
+                !newSpaceImage && styles.mandatoryField,
+              ]}
               onPress={async () => {
                 try {
                   const hasPermission = await checkAndroidPermissions();
@@ -702,36 +790,32 @@ const ProductUpload = ({navigation}) => {
               {newSpaceImage ? (
                 <Image
                   source={{uri: newSpaceImage.uri}}
-                  style={styles.spaceImage}
+                  style={styles.previewImage}
                 />
               ) : (
-                <View style={styles.spaceImagePlaceholder}>
-                  <Image
-                    source={require('../assets/images/Space_default.jpg')}
-                    style={styles.spaceImage}
-                  />
-                  <View style={styles.addSpaceImageButton}>
-                    <Text style={styles.addSpaceImageText}>+</Text>
-                  </View>
-                </View>
+                <Text style={styles.imagePickerText}>Add Space Image (Required)</Text>
               )}
             </TouchableOpacity>
 
             <TextInput
-              style={styles.modalInput}
+              style={[
+                styles.modalInput,
+                !newSpaceName.trim() && styles.mandatoryField,
+              ]}
+              placeholder="Space Name (Required)"
               value={newSpaceName}
               onChangeText={setNewSpaceName}
-              placeholder="Enter space name"
-              autoFocus
             />
+            
             <TextInput
-              style={[styles.modalInput, styles.collectionTextArea]}
+              style={[styles.modalInput, styles.textArea]}
+              placeholder="Space Description (Optional)"
               value={newSpaceDescription}
               onChangeText={setNewSpaceDescription}
-              placeholder="Enter space description"
               multiline
               numberOfLines={4}
             />
+
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
@@ -743,10 +827,16 @@ const ProductUpload = ({navigation}) => {
                 }}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
+              
               <TouchableOpacity
-                style={[styles.modalButton, styles.addButton]}
-                onPress={handleCreateSpace}>
-                <Text style={styles.addButtonText}>Add</Text>
+                style={[
+                  styles.modalButton,
+                  styles.createButton,
+                  (!newSpaceName.trim() || !newSpaceImage) && styles.disabledButton,
+                ]}
+                onPress={handleCreateSpace}
+                disabled={!newSpaceName.trim() || !newSpaceImage}>
+                <Text style={styles.createButtonText}>Create</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -754,69 +844,58 @@ const ProductUpload = ({navigation}) => {
       </Modal>
 
       {/* Add Collection Modal */}
-      <Modal visible={showCollectionInput} transparent animationType="fade">
+      <Modal
+        visible={showCollectionInput}
+        transparent={true}
+        animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, {width: '90%'}]}>
-            <Text style={styles.modalTitle}>Add New Collection</Text>
-
-            {/* Collection Image */}
-            <TouchableOpacity
-              style={styles.spaceImageContainer}
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Create New Collection</Text>
+            
+            <TouchableOpacity 
+              style={styles.imagePickerButton}
               onPress={async () => {
                 try {
-                  const hasPermission = await checkAndroidPermissions();
-                  if (!hasPermission) return;
-
                   const result = await launchImageLibrary({
                     mediaType: 'photo',
                     quality: 0.8,
                     selectionLimit: 1,
+                    includeBase64: true,
                   });
 
-                  if (
-                    !result.didCancel &&
-                    !result.errorCode &&
-                    result.assets?.[0]
-                  ) {
+                  if (!result.didCancel && result.assets?.[0]) {
                     setNewCollectionImage(result.assets[0]);
                   }
                 } catch (error) {
-                  Alert.alert('Error', 'Failed to select photo');
+                  console.error('Error picking image:', error);
                 }
               }}>
               {newCollectionImage ? (
                 <Image
-                  source={{uri: newCollectionImage.uri}}
-                  style={styles.spaceImage}
+                  source={{ uri: newCollectionImage.uri }}
+                  style={styles.previewImage}
                 />
               ) : (
-                <View style={styles.spaceImagePlaceholder}>
-                  <Image
-                    source={require('../assets/images/Space_default.jpg')}
-                    style={styles.spaceImage}
-                  />
-                  <View style={styles.addSpaceImageButton}>
-                    <Text style={styles.addSpaceImageText}>+</Text>
-                  </View>
-                </View>
+                <Text style={styles.imagePickerText}>Add Collection Image</Text>
               )}
             </TouchableOpacity>
 
             <TextInput
               style={styles.modalInput}
+              placeholder="Collection Name"
               value={newCollectionName}
               onChangeText={setNewCollectionName}
-              placeholder="Enter collection name"
-              autoFocus
             />
+            
             <TextInput
-              style={[styles.modalInput, styles.collectionTextArea]}
+              style={[styles.modalInput, styles.textArea]}
+              placeholder="Collection Description"
               value={newCollectionDescription}
               onChangeText={setNewCollectionDescription}
-              placeholder="Enter collection description"
               multiline
               numberOfLines={4}
             />
+
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
@@ -828,10 +907,11 @@ const ProductUpload = ({navigation}) => {
                 }}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
+              
               <TouchableOpacity
-                style={[styles.modalButton, styles.addButton]}
-                onPress={handleAddCollection}>
-                <Text style={styles.addButtonText}>Add</Text>
+                style={[styles.modalButton, styles.createButton]}
+                onPress={handleCreateCollection}>
+                <Text style={styles.createButtonText}>Create</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1153,6 +1233,51 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 32,
     fontWeight: '600',
+  },
+  imagePickerButton: {
+    width: '100%',
+    height: 120,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    marginBottom: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 5,
+  },
+  imagePickerText: {
+    color: '#666',
+  },
+  mandatoryField: {
+    borderColor: '#ff6b6b',
+    borderWidth: 1,
+  },
+  disabledButton: {
+    backgroundColor: '#cccccc',
+  },
+  spaceItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
+  spaceItemImage: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginRight: 8,
+  },
+  spaceItemTextContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  spaceItemCount: {
+    fontSize: 12,
+    color: '#999',
   },
 });
 

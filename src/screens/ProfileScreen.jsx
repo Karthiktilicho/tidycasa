@@ -4,6 +4,8 @@ import LinearGradient from 'react-native-linear-gradient';
 import BottomNavBar from '../components/BottomNavBar';
 import { getUserProfile } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ProfileScreen = ({ navigation }) => {
   const [userProfile, setUserProfile] = useState({
@@ -14,10 +16,16 @@ const ProfileScreen = ({ navigation }) => {
     spaces: 0,
     products: 0
   });
+  const [userStats, setUserStats] = useState({
+    spacesCount: 0,
+    productsCount: 0,
+    collectionsCount: 0
+  });
   const { signOut } = useAuth();
 
   useEffect(() => {
     loadUserProfile();
+    fetchUserStats();
   }, []);
 
   const loadUserProfile = async () => {
@@ -41,6 +49,74 @@ const ProfileScreen = ({ navigation }) => {
       }));
     }
   };
+
+  const fetchUserStats = async () => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      console.log('Token:', token ? 'Present' : 'Missing');
+      
+      if (!token) {
+        throw new Error('No access token found');
+      }
+
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+
+      // Fetch spaces count
+      console.log('Fetching spaces...');
+      const spacesResponse = await axios.get('http://13.49.68.11:3000/spaces/user', { headers });
+      console.log('Spaces response:', spacesResponse.data);
+      const spacesCount = spacesResponse.data?.data?.length || 0;
+
+      // Fetch products count
+      console.log('Fetching products...');
+      const productsResponse = await axios.get('http://13.49.68.11:3000/products', { headers });
+      console.log('Products response:', productsResponse.data);
+      const productsCount = productsResponse.data?.data?.length || 0;
+
+      // Fetch collections count
+      console.log('Fetching collections...');
+      const collectionsResponse = await axios.get('http://13.49.68.11:3000/collections/user/collections', { headers });
+      console.log('Collections response:', collectionsResponse.data);
+      const collectionsCount = collectionsResponse.data?.data?.length || 0;
+
+      console.log('Setting stats:', { spacesCount, productsCount, collectionsCount });
+      setUserStats({
+        spacesCount,
+        productsCount,
+        collectionsCount
+      });
+    } catch (error) {
+      console.error('Error fetching user stats:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      
+      // Set default values in case of error
+      setUserStats({
+        spacesCount: 0,
+        productsCount: 0,
+        collectionsCount: 0
+      });
+
+      // Show error to user
+      Alert.alert(
+        'Error',
+        'Failed to fetch your stats. Please check your internet connection and try again.'
+      );
+    }
+  };
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchUserStats();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const handleLogout = async () => {
     try {
@@ -83,32 +159,38 @@ const ProfileScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.statsContainer}>
-          <View style={styles.statBox}>
-            <Image 
-              source={require('../assets/images/Folder.png')}
-              style={styles.statIcon}
-            />
-            <Text style={styles.statLabel}>Collections</Text>
-            <Text style={styles.statValue}>{userProfile.collections}</Text>
-          </View>
-
-          <View style={styles.statBox}>
-            <Image 
-              source={require('../assets/images/Home.png')}
-              style={styles.statIcon}
-            />
-            <Text style={styles.statLabel}>Spaces</Text>
-            <Text style={styles.statValue}>{userProfile.spaces}</Text>
-          </View>
-
-          <View style={styles.statBox}>
-            <Image 
+          <TouchableOpacity
+            style={styles.statsBox}
+            onPress={() => navigation.navigate('Products')}>
+            <Image
               source={require('../assets/images/Product.png')}
-              style={styles.statIcon}
+              style={styles.statsIcon}
             />
-            <Text style={styles.statLabel}>Products</Text>
-            <Text style={styles.statValue}>{userProfile.products}</Text>
-          </View>
+            <Text style={styles.statsText}>Products</Text>
+            <Text style={styles.statsCount}>{userStats.productsCount}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.statsBox}
+            onPress={() => navigation.navigate('Spaces')}>
+            <Image
+              source={require('../assets/images/Home.png')}
+              style={styles.statsIcon}
+            />
+            <Text style={styles.statsText}>Spaces</Text>
+            <Text style={styles.statsCount}>{userStats.spacesCount}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.statsBox}
+            onPress={() => navigation.navigate('Collections')}>
+            <Image
+              source={require('../assets/images/Folder.png')}
+              style={styles.statsIcon}
+            />
+            <Text style={styles.statsText}>Collections</Text>
+            <Text style={styles.statsCount}>{userStats.collectionsCount}</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Logout Button */}
@@ -254,7 +336,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     paddingHorizontal: 20,
   },
-  statBox: {
+  statsBox: {
     backgroundColor: '#FFFFFF',
     borderRadius: 15,
     padding: 15,
@@ -263,22 +345,22 @@ const styles = StyleSheet.create({
     height: 100,
     justifyContent: 'center',
   },
-  statIcon: {
+  statsIcon: {
     width: 22,
     height: 22,
     marginBottom: 8,
     resizeMode: 'contain',
   },
-  statLabel: {
+  statsText: {
     fontSize: 12,
     color: '#666666',
     marginBottom: 4,
   },
-  statValue: {
+  statsCount: {
     fontSize: 16,
+    color: '#6B46C1',
     fontWeight: 'bold',
-    color: '#333333',
-    marginTop: 4
+    marginTop: 4,
   },
   menuContainer: {
     backgroundColor: '#FFFFFF',

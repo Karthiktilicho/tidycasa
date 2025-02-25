@@ -30,6 +30,7 @@ import ChangePasswordScreen from './src/screens/ChangePasswordScreen';
 import SpacesScreen from './src/screens/SpacesScreen';
 import IndividualSpaceScreen from './src/screens/IndividualSpaceScreen';
 import ProductDetailsScreen from './src/screens/SingleProductScreen';
+import IndividualCollectionScreen from './src/screens/IndividualCollectionScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -131,6 +132,11 @@ const AppStack = () => (
     <Stack.Screen
       name="IndividualProductScreen"
       component={ProductDetailsScreen}
+      options={{headerShown: false}}
+    />
+    <Stack.Screen
+      name="IndividualCollection"
+      component={IndividualCollectionScreen}
       options={{headerShown: false}}
     />
   </>

@@ -72,12 +72,8 @@ const HomeScreen = () => {
         },
       });
 
-      console.log(
-        'Raw Spaces API Response:',
-        JSON.stringify(response.data, null, 2),
-      );
+      console.log('Raw Space Response:', JSON.stringify(response.data, null, 2));
 
-      // Fetch details for each space concurrently
       const spacesWithDetails = await Promise.all(
         (response.data?.data || response.data || []).map(async (space) => {
           const details = await fetchSpaceDetails(
@@ -85,14 +81,17 @@ const HomeScreen = () => {
             token
           );
 
+          console.log('Processing space:', {
+            id: space.id,
+            name: space.name,
+            space_image: space.space_image
+          });
+
           return {
             id: space.id || space.space_id,
             name: space.space_name || space.name || space.title || 'Untitled Space',
             description: space.description || '',
-            image: details.primary_image || 
-              space.space_image ||
-              space.image ||
-              require('../assets/images/placeholder.png'),
+            space_image: space.space_image || null,
             items_count: details.items_count,
             total_worth: details.total_worth,
             created_at: space.created_at,
@@ -100,12 +99,12 @@ const HomeScreen = () => {
         })
       );
 
-      // Sort spaces by creation date
       const sortedSpaces = spacesWithDetails.sort(
         (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)
       );
 
-      // Calculate total items and worth
+      console.log('Processed Spaces:', sortedSpaces);
+
       const totalItemsCount = sortedSpaces.reduce(
         (sum, space) => sum + (space.items_count || 0),
         0
@@ -118,16 +117,8 @@ const HomeScreen = () => {
       setSpaces(sortedSpaces);
       setTotalItems(totalItemsCount);
       setTotalWorth(totalSpacesWorth);
-
-      console.log(
-        'Processed Spaces Data:',
-        JSON.stringify(sortedSpaces, null, 2),
-      );
     } catch (error) {
-      console.error(
-        'Error fetching spaces:',
-        error.response?.data || error.message,
-      );
+      console.error('Error fetching spaces:', error);
       setSpaces([]);
       setTotalItems(0);
       setTotalWorth(0);
@@ -152,11 +143,9 @@ const HomeScreen = () => {
         JSON.stringify(response.data, null, 2),
       );
 
-      // Fetch details for each collection concurrently
       const collectionsWithDetails = await Promise.all(
         (response.data?.data || response.data || []).map(async (collection) => {
           try {
-            // Fetch products for each collection
             const productsResponse = await axios.get(
               `${BASE_URL}/collections/${collection.id}/products`,
               {
@@ -196,7 +185,6 @@ const HomeScreen = () => {
         })
       );
 
-      // Sort collections by creation date
       const sortedCollections = collectionsWithDetails.sort(
         (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)
       );
@@ -223,30 +211,42 @@ const HomeScreen = () => {
     }
   }, [userToken]);
 
-  const renderSpaceCard = ({item}) => (
-    <TouchableOpacity
-      style={styles.spaceCard}
-      onPress={() =>
-        navigation.navigate('IndividualSpace', {
-          spaceId: item.id,
-          spaceName: item.name,
-        })
-      }>
-      <Image
-        source={typeof item.image === 'number' ? item.image : {uri: item.image}}
-        style={styles.spaceImage}
-        resizeMode="cover"
-      />
-      <View style={styles.spaceOverlay}>
-        <Text style={styles.spaceName} numberOfLines={1}>
-          {item.name}
-        </Text>
-        <Text style={styles.itemCount}>
-          {item.items_count || 0} Items
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const renderSpaceCard = ({item}) => {
+    return (
+      <TouchableOpacity
+        style={styles.spaceCard}
+        onPress={() =>
+          navigation.navigate('IndividualSpace', {
+            spaceId: item.id,
+            spaceName: item.name,
+          })
+        }>
+        <Image
+          source={
+            item.space_image
+              ? {uri: item.space_image}
+              : require('../assets/images/Space_default.jpg')
+          }
+          style={styles.spaceImage}
+          resizeMode="cover"
+          onError={(e) => console.log('Space image load error:', {
+            spaceId: item.id,
+            spaceName: item.name,
+            space_image: item.space_image,
+            error: e.nativeEvent
+          })}
+        />
+        <View style={styles.spaceOverlay}>
+          <Text style={styles.spaceName} numberOfLines={1}>
+            {item.name}
+          </Text>
+          <Text style={styles.itemCount}>
+            {item.items_count || 0} Items
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const renderCollectionCard = ({item}) => (
     <TouchableOpacity

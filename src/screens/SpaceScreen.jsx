@@ -51,7 +51,7 @@ const SpaceScreen = ({navigation}) => {
         item.space_image ||
         item.image ||
         require('../assets/images/placeholder.png'),
-      items_count: item.items_count || 0,
+      items_count: item.total_products || 0,
       total_worth: item.total_worth || 0,
     };
 
@@ -79,7 +79,9 @@ const SpaceScreen = ({navigation}) => {
           </Text>
           <Text style={styles.productCount}>
             {spaceDetails.items_count}{' '}
-            <Text style={styles.productCountLabel}>Products</Text>
+            <Text style={styles.productCountLabel}>
+              {spaceDetails.items_count === 1 ? 'Item' : 'Items'}
+            </Text>
           </Text>
         </View>
       </TouchableOpacity>

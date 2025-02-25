@@ -8,15 +8,18 @@ import {
   Image, 
   StatusBar,
   ActivityIndicator,
-  Alert
+  Alert,
+  Modal
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 
 const BASE_URL = 'http://13.49.68.11:3000';
 
 const ChangePasswordScreen = ({ navigation }) => {
+  const nav = useNavigation();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -24,6 +27,7 @@ const ChangePasswordScreen = ({ navigation }) => {
   const [newPasswordError, setNewPasswordError] = useState('');
   const [confirmPasswordError, setConfirmPasswordError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const validatePassword = (password) => {
     return password.length >= 6;
@@ -85,16 +89,11 @@ const ChangePasswordScreen = ({ navigation }) => {
         );
 
         if (response.data) {
-          Alert.alert(
-            'Success',
-            'Password changed successfully!',
-            [
-              {
-                text: 'OK',
-                onPress: () => navigation.goBack()
-              }
-            ]
-          );
+          setShowSuccessModal(true);
+          // Clear the form
+          setCurrentPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
         }
       } catch (error) {
         console.error('Password change error:', error.response?.data || error.message);
@@ -107,6 +106,34 @@ const ChangePasswordScreen = ({ navigation }) => {
       }
     }
   };
+
+  const SuccessModal = () => (
+    <Modal
+      animationType="fade"
+      transparent={true}
+      visible={showSuccessModal}
+      onRequestClose={() => {
+        setShowSuccessModal(false);
+        nav.navigate('Profile');
+      }}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalView}>
+          <Text style={styles.modalTitle}>Success!</Text>
+          <Text style={styles.modalText}>
+            Your password has been updated successfully.
+          </Text>
+          <TouchableOpacity
+            style={styles.okButton}
+            onPress={() => {
+              setShowSuccessModal(false);
+              nav.navigate('Profile');
+            }}>
+            <Text style={styles.okButtonText}>Okay</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 
   return (
     <View style={styles.container}>
@@ -191,6 +218,7 @@ const ChangePasswordScreen = ({ navigation }) => {
           )}
         </TouchableOpacity>
       </View>
+      <SuccessModal />
     </View>
   );
 };
@@ -268,7 +296,51 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-  }
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalView: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 30,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    width: '80%',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#000',
+  },
+  modalText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+    color: '#333',
+  },
+  okButton: {
+    backgroundColor: '#9F7AEA',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 8,
+  },
+  okButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });
 
 export default ChangePasswordScreen;
