@@ -44,7 +44,7 @@ const SpacesScreen = ({navigation}) => {
           name: space.space_name || space.name || 'Unnamed Space',
           description: space.description || '',
           space_image: space.space_image || null,
-          items_count: space.items_count || 0,
+          items_count: space.products.total_products || 0,
           created_at: space.created_at,
         }));
 

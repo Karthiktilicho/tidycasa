@@ -1,21 +1,21 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {useNavigation} from '@react-navigation/native';
+import axios from 'axios';
 import React, {useEffect, useState} from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
   Dimensions,
+  FlatList,
+  Image,
   SafeAreaView,
   StatusBar,
-  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import {useNavigation} from '@react-navigation/native';
-import {useAuth} from '../context/AuthContext';
-import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBar from '../components/BottomNavBar';
+import {useAuth} from '../context/AuthContext';
 
 const BASE_URL = 'http://13.49.68.11:3000';
 const {width} = Dimensions.get('window');
@@ -146,16 +146,12 @@ const HomeScreen = () => {
         },
       );
 
-      console.log(
-        'Raw Collections API Response:',
-        JSON.stringify(response.data, null, 2),
-      );
-
       const collectionsWithDetails = await Promise.all(
         (response.data?.data || response.data || []).map(async collection => {
           try {
+            console.log('colll', collection);
             const productsResponse = await axios.get(
-              `${BASE_URL}/collections/${collection.id}/products`,
+              `${BASE_URL}/collections/${collection.collection_id}/products`,
               {
                 headers: {
                   Authorization: `Bearer ${token}`,
@@ -180,7 +176,7 @@ const HomeScreen = () => {
                   : collection.collection_image ||
                     collection.image ||
                     require('../assets/images/placeholder.png'),
-              items_count: products.length,
+              items_count: collection.products.total_products,
               total_worth: products.reduce(
                 (sum, product) => sum + (parseFloat(product.price) || 0),
                 0,
@@ -279,16 +275,23 @@ const HomeScreen = () => {
       style={styles.spaceCard}
       onPress={() => {
         console.log('Navigating to CollectionDetail with ID:', item.id);
-        navigation.navigate('CollectionDetail', {
-          collection: {
-            id: item.id,
-            name: item.name,
-            description: item.description,
-            image:
-              typeof item.image === 'number' ? item.image : {uri: item.image},
-            items_count: item.items_count,
+        navigation.navigate(
+          'IndividualCollection',
+          {
+            collectionId: item.id,
+            collectionName: item.name,
           },
-        });
+          //   {
+          //   collection: {
+          //     id: item.id,
+          //     name: item.name,
+          //     description: item.description,
+          //     image:
+          //       typeof item.image === 'number' ? item.image : {uri: item.image},
+          //     items_count: item.items_count,
+          //   },
+          // }
+        );
       }}>
       <Image
         source={typeof item.image === 'number' ? item.image : {uri: item.image}}

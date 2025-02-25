@@ -14,8 +14,8 @@ import {
   View,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import {useAuth} from '../context/AuthContext';
 import Snackbar from 'react-native-snackbar';
+import {useAuth} from '../context/AuthContext';
 
 const BASE_URL = 'http://13.49.68.11:3000';
 
@@ -139,6 +139,7 @@ function LoginScreen() {
         navigation.replace('Home');
       } else {
         // Handle unexpected response structure
+        setLoading(false);
         throw new Error('Invalid login response');
       }
     } catch (error) {

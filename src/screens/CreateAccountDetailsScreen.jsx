@@ -3,7 +3,6 @@ import axios from 'axios';
 import React, {useEffect, useState} from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   ScrollView,
   StatusBar,
@@ -140,7 +139,7 @@ function CreateAccountDetailsScreen({navigation}) {
           marginBottom: 10,
           backgroundColor: 'green',
         });
-        navigation.navigate('LoginScreen');
+        navigation.navigate('Login');
       }
     } catch (error) {
       Snackbar.show({

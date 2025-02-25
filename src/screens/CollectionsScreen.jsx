@@ -1,22 +1,22 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  RefreshControl,
   Alert,
   Image,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBar from '../components/BottomNavBar';
 import SkeletonLoader from '../components/SkeletonLoader';
 
 const BASE_URL = 'http://13.49.68.11:3000';
 
-const CollectionsScreen = ({ navigation }) => {
+const CollectionsScreen = ({navigation}) => {
   const [collections, setCollections] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -26,23 +26,34 @@ const CollectionsScreen = ({ navigation }) => {
     try {
       setLoading(true);
       const token = await AsyncStorage.getItem('accessToken');
-      
-      const response = await axios.get(`${BASE_URL}/collections/user/collections`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
 
-      console.log('Collections Response:', JSON.stringify(response.data, null, 2));
+      const response = await axios.get(
+        `${BASE_URL}/collections/user/collections`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      console.log(
+        'Collections Response:',
+        JSON.stringify(response.data, null, 2),
+      );
 
       if (response.data && Array.isArray(response.data.data)) {
         const collectionsData = response.data.data.map(collection => ({
           id: collection.id || collection.collection_id,
-          name: collection.name || collection.collection_name || 'Unnamed Collection',
-          image: collection.collection_image || require('../assets/images/Space_default.jpg'),
-          productCount: collection.product_count || 0,
-          spaceId: collection.space_id
+          name:
+            collection.name ||
+            collection.collection_name ||
+            'Unnamed Collection',
+          image:
+            collection.collection_image ||
+            require('../assets/images/Space_default.jpg'),
+          productCount: collection.products.total_products || 0,
+          spaceId: collection.space_id,
         }));
 
         setCollections(collectionsData);
@@ -53,15 +64,13 @@ const CollectionsScreen = ({ navigation }) => {
     } catch (error) {
       console.error('Error fetching collections:', error);
 
-      Alert.alert(
-        'Error', 
-        'Could not fetch collections. Please try again.',
-        [{ 
-          text: 'Retry', 
-          onPress: fetchCollections 
-        }]
-      );
-      
+      Alert.alert('Error', 'Could not fetch collections. Please try again.', [
+        {
+          text: 'Retry',
+          onPress: fetchCollections,
+        },
+      ]);
+
       setLoading(false);
     }
   }, []);
@@ -106,15 +115,14 @@ const CollectionsScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <ScrollView 
+      <ScrollView
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
             colors={['#6B46C1']}
           />
-        }
-      >
+        }>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Collections</Text>
         </View>
@@ -122,11 +130,12 @@ const CollectionsScreen = ({ navigation }) => {
         {collections.length === 0 ? (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>No collections found</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.createCollectionButton}
-              onPress={() => navigation.navigate('CreateCollection')}
-            >
-              <Text style={styles.createCollectionButtonText}>Create First Collection</Text>
+              onPress={() => navigation.navigate('CreateCollection')}>
+              <Text style={styles.createCollectionButtonText}>
+                Create First Collection
+              </Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -154,7 +163,8 @@ const CollectionsScreen = ({ navigation }) => {
                     {collection.name}
                   </Text>
                   <Text style={styles.productCount}>
-                    {collection.productCount} {collection.productCount === 1 ? 'Product' : 'Products'}
+                    {collection.productCount}{' '}
+                    {collection.productCount === 1 ? 'Product' : 'Products'}
                   </Text>
                 </View>
               </TouchableOpacity>
