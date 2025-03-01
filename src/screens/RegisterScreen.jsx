@@ -1,8 +1,9 @@
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, {useState} from 'react';
 import {
   ActivityIndicator,
-  Alert,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,33 +11,52 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Snackbar from 'react-native-snackbar';
+import Snackbar from '../components/Snackbar';
 
-function RegisterScreen({navigation}) {
+const BASE_URL = 'http://13.60.211.186:3000';
+
+export const RegisterScreen = ({navigation}) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    visible: false,
+    message: '',
+    type: 'success'
+  });
+
+  const showSnackbar = (message, type = 'success') => {
+    setSnackbar({
+      visible: true,
+      message,
+      type
+    });
+    // Hide snackbar after 3 seconds
+    setTimeout(() => {
+      setSnackbar(prev => ({...prev, visible: false}));
+    }, 3000);
+  };
 
   const validateInputs = () => {
     if (!email || !password || !confirmPassword) {
-      Alert.alert('Error', 'All fields are required');
+      showSnackbar('All fields are required', 'error');
       return false;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      showSnackbar('Passwords do not match', 'error');
       return false;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      Alert.alert('Error', 'Please enter a valid email');
+      showSnackbar('Please enter a valid email', 'error');
       return false;
     }
 
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      showSnackbar('Password must be at least 6 characters', 'error');
       return false;
     }
 
@@ -50,29 +70,21 @@ function RegisterScreen({navigation}) {
 
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost:3000/auth/register', {
+      const response = await axios.post(`${BASE_URL}/auth/register`, {
         email,
         password,
       });
 
       if (response.data) {
-        Alert.alert('Success', 'Registration successful! Please login.', [
-          {text: 'OK', onPress: () => navigation.navigate('Login')},
-        ]);
+        showSnackbar('Registration successful! Please login.', 'success');
+        navigation.navigate('Login');
       }
     } catch (error) {
-      // Alert.alert(
-      //   'Registration Failed',
-      //   error.response?.data?.message ||
-      //     'An error occurred during registration',
-      // );
-      Snackbar.show({
-        text:
-          error.response?.data?.message ||
+      showSnackbar(
+        error.response?.data?.message ||
           'An error occurred during registration',
-        duration: Snackbar.LENGTH_SHORT,
-        marginBottom: 10,
-      });
+        'error'
+      );
     } finally {
       setLoading(false);
     }
@@ -124,6 +136,12 @@ function RegisterScreen({navigation}) {
           onPress={() => navigation.navigate('Login')}>
           <Text style={styles.linkText}>Already have an account? Login</Text>
         </TouchableOpacity>
+
+        <Snackbar
+          visible={snackbar.visible}
+          message={snackbar.message}
+          type={snackbar.type}
+        />
       </View>
     </ScrollView>
   );
@@ -172,5 +190,3 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
-
-export default RegisterScreen;

@@ -39,7 +39,7 @@ const BackgroundPattern = () => (
   </View>
 );
 
-function CreateAccountDetailsScreen({navigation}) {
+export const CreateAccountDetailsScreen = ({navigation}) => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -109,7 +109,7 @@ function CreateAccountDetailsScreen({navigation}) {
       });
 
       const response = await axios.post(
-        'http://13.49.68.11:3000/auth/register',
+        'http://13.60.211.186:3000/auth/register',
         {
           username,
           email,
@@ -278,7 +278,9 @@ function CreateAccountDetailsScreen({navigation}) {
       </View>
     </ScrollView>
   );
-}
+};
+
+export default CreateAccountDetailsScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -441,5 +443,3 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 });
-
-export default CreateAccountDetailsScreen;

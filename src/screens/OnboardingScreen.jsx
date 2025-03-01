@@ -25,7 +25,7 @@ const BackgroundPattern = () => (
   </View>
 );
 
-function OnboardingScreen({ navigation }) {
+export const OnboardingScreen = ({ navigation }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollX = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef(null);
@@ -105,7 +105,7 @@ function OnboardingScreen({ navigation }) {
       </View>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -219,4 +219,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
+
 export default OnboardingScreen;

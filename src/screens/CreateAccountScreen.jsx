@@ -27,7 +27,7 @@ const BackgroundPattern = () => (
   </View>
 );
 
-const CreateAccountScreen = ({navigation}) => {
+export const CreateAccountScreen = ({navigation}) => {
   return (
     <ScrollView style={styles.container}>
       <StatusBar backgroundColor="#6B46C1" barStyle="light-content" />
@@ -107,6 +107,8 @@ const CreateAccountScreen = ({navigation}) => {
     </ScrollView>
   );
 };
+
+export default CreateAccountScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -242,5 +244,3 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
-
-export default CreateAccountScreen;

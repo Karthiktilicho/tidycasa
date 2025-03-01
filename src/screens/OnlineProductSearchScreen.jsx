@@ -11,9 +11,9 @@ import {
 import * as ImagePicker from 'react-native-image-picker';
 import Snackbar from 'react-native-snackbar';
 
-const BASE_URL = 'http://13.49.68.11:3000';
+const BASE_URL = 'http://13.60.211.186:3000';
 
-const OnlineProductSearchScreen = ({navigation, route}) => {
+export const OnlineProductSearchScreen = ({navigation, route}) => {
   const [loading, setLoading] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [error, setError] = useState(null);
@@ -263,6 +263,8 @@ const OnlineProductSearchScreen = ({navigation, route}) => {
   );
 };
 
+export default OnlineProductSearchScreen;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -382,5 +384,3 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
-
-export default OnlineProductSearchScreen;

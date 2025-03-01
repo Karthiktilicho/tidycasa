@@ -15,9 +15,9 @@ import BottomNavBar from '../components/BottomNavBar';
 import SkeletonLoader from '../components/SkeletonLoader';
 import Snackbar from 'react-native-snackbar';
 
-const BASE_URL = 'http://13.49.68.11:3000';
+const BASE_URL = 'http://13.60.211.186:3000';
 
-const CollectionsScreen = ({navigation}) => {
+export const CollectionsScreen = ({navigation}) => {
   const [collections, setCollections] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -118,9 +118,20 @@ const CollectionsScreen = ({navigation}) => {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Collections</Text>
+          <SkeletonLoader width="50%" height={20} />
         </View>
-        {renderSkeletonLoaders()}
+        <View style={styles.collectionGrid}>
+          {[1, 2, 3, 4, 5, 6].map(key => (
+            <View key={key} style={styles.collectionCard}>
+              <SkeletonLoader width="100%" height={150} />
+              <View style={styles.collectionInfo}>
+                <SkeletonLoader width="80%" height={20} style={{marginBottom: 8}} />
+                <SkeletonLoader width="40%" height={16} />
+              </View>
+            </View>
+          ))}
+        </View>
+        <BottomNavBar navigation={navigation} />
       </View>
     );
   }
@@ -140,14 +151,20 @@ const CollectionsScreen = ({navigation}) => {
         </View>
 
         {collections.length === 0 ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>No collections found</Text>
+          <View style={styles.emptyStateContainer}>
+            <Image 
+              source={require('../assets/images/collections_empty_state.png')} 
+              style={styles.emptyStateImage}
+              resizeMode="contain"
+            />
+            <Text style={styles.emptyStateTitle}>No Collections Yet</Text>
+            <Text style={styles.emptyStateDescription}>
+              Create your first collection by adding similar products.
+            </Text>
             <TouchableOpacity
-              style={styles.createCollectionButton}
-              onPress={() => navigation.navigate('CreateCollection')}>
-              {/* <Text style={styles.createCollectionButtonText}>
-                Create First Collection
-              </Text> */}
+              style={styles.addProductButton}
+              onPress={() => navigation.navigate('ProductUpload')}>
+              <Text style={styles.addProductButtonText}>Add Product</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -190,74 +207,99 @@ const CollectionsScreen = ({navigation}) => {
   );
 };
 
+export default CollectionsScreen;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F4F4F4',
   },
   header: {
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e1e1e1',
+    backgroundColor: '#6B46C1',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
   },
   headerTitle: {
-    fontSize: 24,
+    color: 'white',
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
   },
   collectionGrid: {
-    padding: 16,
+    padding: 20,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
   collectionCard: {
-    width: '48%',
-    marginBottom: 16,
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    overflow: 'hidden',
+    width: '48%', // Slightly less than half to allow for spacing
+    backgroundColor: 'white',
+    borderRadius: 10,
+    marginBottom: 15,
   },
   collectionImage: {
     width: '100%',
     height: 150,
-    resizeMode: 'cover',
+  },
+  collectionOverlay: {
+    padding: 10,
   },
   collectionInfo: {
-    padding: 12,
+    padding: 10,
   },
   collectionName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#333',
-    marginBottom: 4,
   },
   productCount: {
     fontSize: 14,
     color: '#666',
+    marginTop: 5,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center', // Centers vertically
-    alignItems: 'center', // Centers horizontally
-    padding: 20,
-  },
-  errorText: {
-    fontSize: 16,
+  loadingText: {
+    fontSize: 18,
+    textAlign: 'center',
+    marginTop: 20,
     color: '#666',
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    marginTop: 40,
+  },
+  emptyStateImage: {
+    width: '80%',
+    height: 250,
+    marginBottom: 20,
+  },
+  emptyStateTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
     textAlign: 'center',
   },
+  emptyStateDescription: {
+    fontSize: 16,
+    textAlign: 'center',
+    color: '#666',
+    marginBottom: 20,
+  },
+  addProductButton: {
+    backgroundColor: '#6B46C1',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 25,
+  },
+  addProductButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 });
-
-export default CollectionsScreen;

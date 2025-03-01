@@ -15,9 +15,9 @@ import axios from 'axios';
 import BottomNavBar from '../components/BottomNavBar';
 import SkeletonLoader from '../components/SkeletonLoader';
 
-const BASE_URL = 'http://13.49.68.11:3000';
+const BASE_URL = 'http://13.60.211.186:3000';
 
-const IndividualCollectionScreen = ({route, navigation}) => {
+export const IndividualCollectionScreen = ({route, navigation}) => {
   const {collectionId, collectionName} = route.params;
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -247,6 +247,8 @@ const IndividualCollectionScreen = ({route, navigation}) => {
   );
 };
 
+export default IndividualCollectionScreen;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -371,5 +373,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
-export default IndividualCollectionScreen;

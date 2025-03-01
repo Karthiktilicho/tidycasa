@@ -13,22 +13,18 @@ import {
   FlatList,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import {useNavigation, useRoute} from '@react-navigation/native';
+import {useRoute} from '@react-navigation/native';
 import {useAuth} from '../context/AuthContext';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBar from '../components/BottomNavBar';
 
-const BASE_URL = 'http://13.49.68.11:3000';
+const BASE_URL = 'http://13.60.211.186:3000';
 const {width} = Dimensions.get('window');
 const cardMargin = 10;
 const cardWidth = (width - 4 * cardMargin) / 3; // Adjusting width for 3 columns
 
-const HomeScreen = () => {
-  const navigation = useNavigation();
-  const route = useRoute();
-
-  console.log(route.params, 'parmas');
+export const IndividualSpaceScreen = ({ navigation, route }) => {
   const [products, setProducts] = useState([]);
   const [spaceName, setSpaceName] = useState('');
   const [error, setError] = useState(null);
@@ -392,4 +388,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default HomeScreen;
+export default IndividualSpaceScreen;

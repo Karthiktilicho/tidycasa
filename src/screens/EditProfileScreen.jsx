@@ -16,7 +16,7 @@ import {launchImageLibrary} from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
 import Snackbar from 'react-native-snackbar';
 
-const EditProfileScreen = ({navigation, route}) => {
+export const EditProfileScreen = ({navigation, route}) => {
   const {initialName, initialPhone, initialProfileImage} = route.params || {};
   const [profileImage, setProfileImage] = useState(
     initialProfileImage
@@ -37,11 +37,20 @@ const EditProfileScreen = ({navigation, route}) => {
   }, [route.params?.initialProfileImage]);
 
   const handleUpdateProfile = async () => {
-    if (!userProfile.name) {
-      // Alert.alert('Error', 'Name is required');
-      Snackbar.show('Error', 'Name is required', Snackbar.LENGTH_SHORT);
+    // Trim the name and check if it's empty
+    const trimmedName = userProfile.name.trim();
+    
+    if (!trimmedName) {
+      Snackbar.show({
+        text: 'Name is required',
+        duration: Snackbar.LENGTH_SHORT,
+        backgroundColor: 'red'
+      });
       return;
     }
+
+    // Update userProfile with trimmed name
+    setUserProfile(prev => ({...prev, name: trimmedName}));
 
     setIsLoading(true);
     try {
@@ -51,7 +60,7 @@ const EditProfileScreen = ({navigation, route}) => {
       }
 
       const formData = new FormData();
-      formData.append('username', userProfile.name);
+      formData.append('username', trimmedName);
       formData.append('phone_number', userProfile.phone);
 
       // Only append profile image if it's from gallery (has uri)
@@ -61,13 +70,11 @@ const EditProfileScreen = ({navigation, route}) => {
           type: 'image/jpeg',
           name: 'profile_image.jpg',
         };
-        console.log('Uploading image:', imageFile);
         formData.append('profile_image', imageFile);
       }
 
-      console.log('Sending form data:', formData);
       const response = await axios.put(
-        'http://13.49.68.11:3000/profile/update-profile',
+        'http://13.60.211.186:3000/profile/update-profile',
         formData,
         {
           headers: {
@@ -78,12 +85,10 @@ const EditProfileScreen = ({navigation, route}) => {
         },
       );
 
-      console.log('Update response:', response.data);
-
       if (response.data) {
         // Get the updated profile to ensure we have the latest data
         const profileResponse = await axios.get(
-          'http://13.49.68.11:3000/profile',
+          'http://13.60.211.186:3000/profile',
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -94,57 +99,31 @@ const EditProfileScreen = ({navigation, route}) => {
 
         const updatedProfileData = profileResponse.data.data;
 
-        // Alert.alert(
-        //   'Success',
-        //   'Profile updated successfully',
-        //   [
-        //     {
-        //       text: 'OK',
-        //       onPress: () => {
-        //         // Navigate back with the latest profile data
-        //         navigation.navigate('Profile', {
-        //           refresh: true,
-        //           updatedProfile: {
-        //             name: updatedProfileData.name,
-        //             phone: updatedProfileData.phone_number,
-        //             profile_image: updatedProfileData.profile_image,
-        //           },
-        //         });
-        //       },
-        //     },
-        //   ],
-        //   {cancelable: false},
-        // );
-
         Snackbar.show({
-          text: 'Error, Name is required',
-          duration: Snackbar.LENGTH_INDEFINITE,
-          action: {
-            text: 'OK',
-            onPress: () => {
-              navigation.navigate('Profile', {
-                refresh: true,
-                updatedProfile: {
-                  name: updatedProfileData.name,
-                  phone: updatedProfileData.phone_number,
-                  profile_image: updatedProfileData.profile_image,
-                },
-              });
-            },
-          },
+          text: 'Profile updated successfully',
+          duration: Snackbar.LENGTH_SHORT,
+          backgroundColor: 'green'
         });
+
+        // Navigate back to profile screen after a short delay
+        setTimeout(() => {
+          navigation.navigate('Profile', {
+            refresh: true,
+            updatedProfile: {
+              name: updatedProfileData.name,
+              phone: updatedProfileData.phone_number,
+              profile_image: updatedProfileData.profile_image,
+            },
+          });
+        }, 500);
       }
     } catch (error) {
       console.error('Failed to update profile:', error);
-      console.error('Error response:', error.response?.data);
-      // Alert.alert(
-      //   'Error',
-      //   error.response?.data?.message || 'Failed to update profile',
-      // );
-      Snackbar.show(
-        error.response?.data?.message || 'Failed to update profile',
-        Snackbar.LENGTH_SHORT,
-      );
+      Snackbar.show({
+        text: error.response?.data?.message || 'Failed to update profile',
+        duration: Snackbar.LENGTH_SHORT,
+        backgroundColor: 'red'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -165,7 +144,6 @@ const EditProfileScreen = ({navigation, route}) => {
       }
 
       if (result.errorCode) {
-        // Alert.alert('Error', 'Failed to pick image');
         Snackbar.show('Failed to pick image', Snackbar.LENGTH_SHORT);
         return;
       }
@@ -174,7 +152,6 @@ const EditProfileScreen = ({navigation, route}) => {
         const selectedImage = result.assets[0];
         // Check file size (limit to 5MB)
         if (selectedImage.fileSize > 5 * 1024 * 1024) {
-          // Alert.alert('Error', 'Image size should be less than 5MB');
           Snackbar.show(
             'Image size should be less than 5MB',
             Snackbar.LENGTH_SHORT,
@@ -191,7 +168,6 @@ const EditProfileScreen = ({navigation, route}) => {
       }
     } catch (error) {
       console.error('Image picker error:', error);
-      // Alert.alert('Error', 'Failed to pick image');
       Snackbar.show('Failed to pick image', Snackbar.LENGTH_SHORT);
     }
   };

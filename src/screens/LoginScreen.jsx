@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {useNavigation} from '@react-navigation/native';
 import axios from 'axios';
 import React, {useEffect, useState} from 'react';
 import {
@@ -17,7 +16,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Snackbar from 'react-native-snackbar';
 import {useAuth} from '../context/AuthContext';
 
-const BASE_URL = 'http://13.49.68.11:3000';
+const BASE_URL = 'http://13.60.211.186:3000';
 
 const BackgroundPattern = () => (
   <View style={styles.backgroundPattern}>
@@ -36,8 +35,7 @@ const BackgroundPattern = () => (
   </View>
 );
 
-function LoginScreen() {
-  const navigation = useNavigation();
+export const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [keepSignedIn, setKeepSignedIn] = useState(false);
@@ -347,7 +345,9 @@ function LoginScreen() {
       </View>
     </ScrollView>
   );
-}
+};
+
+export default LoginScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -571,5 +571,3 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
-
-export default LoginScreen;

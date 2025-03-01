@@ -1,8 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
-  Alert,
   Animated,
   FlatList,
   Image,
@@ -16,12 +15,13 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ActivityIndicator
 } from 'react-native';
 import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
 import Snackbar from 'react-native-snackbar';
 import BottomNavBar from '../components/BottomNavBar';
-const BASE_URL = 'http://13.49.68.11:3000';
-const ProductUpload = ({navigation, route}) => {
+const BASE_URL = 'http://13.60.211.186:3000';
+export const ProductUploadScreen = ({navigation, route}) => {
   const [images, setImages] = useState([]);
   const [productName, setProductName] = useState(
     route.params?.prefillData?.title || '',
@@ -47,12 +47,32 @@ const ProductUpload = ({navigation, route}) => {
   const [newCollectionImage, setNewCollectionImage] = useState(null);
   const [loadingCollections, setLoadingCollections] = useState(true);
 
+  const [isValid, setIsValid] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
   const checkAndroidPermissions = async () => {
     if (Platform.OS !== 'android') {
       return true;
     }
 
     try {
+      // Request camera permission first - required for all Android versions
+      const cameraPermission = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+        {
+          title: 'Camera Permission',
+          message: 'This app needs access to your camera to take photos.',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        },
+      );
+      
+      if (cameraPermission !== PermissionsAndroid.RESULTS.GRANTED) {
+        showPermissionAlert('camera');
+        return false;
+      }
+      
       // For Android 13 and above (API level 33+)
       if (Platform.Version >= 33) {
         const result = await PermissionsAndroid.request(
@@ -67,7 +87,7 @@ const ProductUpload = ({navigation, route}) => {
           },
         );
         if (result !== PermissionsAndroid.RESULTS.GRANTED) {
-          showPermissionAlert();
+          showPermissionAlert('storage');
           return false;
         }
       } else {
@@ -84,7 +104,7 @@ const ProductUpload = ({navigation, route}) => {
           },
         );
         if (result !== PermissionsAndroid.RESULTS.GRANTED) {
-          showPermissionAlert();
+          showPermissionAlert('storage');
           return false;
         }
       }
@@ -95,17 +115,25 @@ const ProductUpload = ({navigation, route}) => {
     }
   };
 
-  const showPermissionAlert = () => {
-    Alert.alert(
-      'Permission Required',
-      'This app needs access to your photos to upload product images. Please enable it in your device settings.',
-      [
-        {text: 'Cancel', style: 'cancel'},
-        {text: 'Open Settings', onPress: openSettings},
-      ],
-    );
-
-    // Snackbar.show('Failed to pick image', Snackbar.LENGTH_SHORT);
+  const showPermissionAlert = (permissionType = 'storage') => {
+    const title = 'Permission Required';
+    let message = '';
+    
+    if (permissionType === 'camera') {
+      message = 'This app needs access to your camera to take photos. Please enable it in your device settings.';
+    } else {
+      message = 'This app needs access to your photos to upload product images. Please enable it in your device settings.';
+    }
+    
+    Snackbar.show({
+      text: message,
+      duration: Snackbar.LENGTH_SHORT,
+      action: {
+        text: 'Open Settings',
+        textColor: 'blue',
+        onPress: openSettings,
+      },
+    });
   };
 
   const openSettings = () => {
@@ -117,64 +145,100 @@ const ProductUpload = ({navigation, route}) => {
   };
 
   const handleImagePick = async () => {
-    if (await checkAndroidPermissions()) {
-      const options = {
-        mediaType: 'photo',
-        includeBase64: false,
-        maxHeight: 800,
-        maxWidth: 800,
-        quality: 0.7,
-        selectionLimit: 10,
-      };
+    if (!(await checkAndroidPermissions())) {
+      return;
+    }
 
-      launchImageLibrary(options, async response => {
-        if (response.didCancel) {
-          return;
-        }
+    const options = {
+      mediaType: 'photo',
+      includeBase64: false,
+      maxHeight: 800,
+      maxWidth: 800,
+      quality: 0.7,
+      selectionLimit: 10,
+    };
 
-        if (response.errorCode) {
-          console.error('Image picker error:', {
-            code: response.errorCode,
-            message: response.errorMessage,
-          });
-          // Alert.alert('Error', 'Failed to pick image');
-          Snackbar.show('Failed to pick image', Snackbar.LENGTH_SHORT);
-          return;
-        }
+    try {
+      const response = await launchImageLibrary(options);
 
-        try {
-          const selectedImages = response.assets;
-          console.log('Selected images details:', {
-            count: selectedImages.length,
-          });
+      if (response.didCancel) {
+        return;
+      }
 
-          // Ensure the images have proper file paths
-          const imageUris = selectedImages.map(image => {
-            const imageUri = image.uri.startsWith('file://')
-              ? image.uri
-              : `file://${image.uri}`;
-            return {
-              uri: imageUri,
-              type: image.type || 'image/jpeg',
-              name: `image_${Date.now()}.jpg`,
-            };
-          });
+      if (response.errorCode) {
+        console.error('Image picker error:', {
+          code: response.errorCode,
+          message: response.errorMessage,
+        });
+        Snackbar.show({
+          text: 'Failed to pick image: ' + response.errorMessage,
+          duration: Snackbar.LENGTH_SHORT,
+        });
+        return;
+      }
 
-          setImages([...images, ...imageUris]);
-        } catch (error) {
-          console.error('Error processing images:', error);
-          // Alert.alert('Error', 'Failed to process the selected images');
-          Snackbar.show(
-            'Failed to process the selected images',
-            Snackbar.LENGTH_SHORT,
-          );
-        }
+      if (!response.assets || response.assets.length === 0) {
+        Snackbar.show({
+          text: 'No images were selected',
+          duration: Snackbar.LENGTH_SHORT,
+        });
+        return;
+      }
+
+      const selectedImages = response.assets;
+      console.log('Selected images details:', {
+        count: selectedImages.length,
+      });
+
+      // Ensure the images have proper file paths
+      const imageUris = selectedImages.map(image => {
+        const imageUri = Platform.OS === 'android' 
+          ? image.uri 
+          : image.uri.startsWith('file://') 
+            ? image.uri 
+            : `file://${image.uri}`;
+            
+        return {
+          uri: imageUri,
+          type: image.type || 'image/jpeg',
+          name: `image_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`,
+        };
+      });
+
+      setImages(prevImages => [...prevImages, ...imageUris]);
+
+      // Navigate to OnlineProductSearch with the first selected image
+      if (selectedImages.length > 0) {
+        const firstImage = selectedImages[0];
+        const imageUri = Platform.OS === 'android'
+          ? firstImage.uri
+          : firstImage.uri.startsWith('file://')
+            ? firstImage.uri
+            : `file://${firstImage.uri}`;
+
+        navigation.navigate('OnlineProductSearch', {
+          imageUri,
+          imageType: firstImage.type || 'image/jpeg',
+        });
+      }
+    } catch (error) {
+      console.error('Error in handleImagePick:', error);
+      Snackbar.show({
+        text: 'An error occurred while picking images. Please try again.',
+        duration: Snackbar.LENGTH_SHORT,
       });
     }
   };
 
   const handleCameraLaunch = async () => {
-    if (await checkAndroidPermissions()) {
+    try {
+      // Check permissions first
+      const hasPermission = await checkAndroidPermissions();
+      if (!hasPermission) {
+        console.log('Camera permission denied');
+        return;
+      }
+
       const options = {
         mediaType: 'photo',
         includeBase64: false,
@@ -184,96 +248,189 @@ const ProductUpload = ({navigation, route}) => {
         saveToPhotos: true,
       };
 
-      launchCamera(options, async response => {
-        if (response.didCancel) {
-          return;
+      console.log('Launching camera with options:', options);
+      const response = await launchCamera(options);
+      
+      // Close the image options modal first
+      setShowImageOptions(false);
+
+      if (response.didCancel) {
+        console.log('User cancelled camera');
+        return;
+      }
+
+      if (response.errorCode) {
+        console.error('Camera error:', {
+          code: response.errorCode,
+          message: response.errorMessage,
+        });
+        
+        // Show more specific error messages based on error code
+        let errorMessage = 'Failed to capture image';
+        if (response.errorCode === 'camera_unavailable') {
+          errorMessage = 'Camera is not available on this device';
+        } else if (response.errorCode === 'permission') {
+          errorMessage = 'Camera permission denied';
+          // Try to request permission again
+          setTimeout(() => {
+            checkAndroidPermissions();
+          }, 1000);
         }
+        
+        Snackbar.show({
+          text: errorMessage,
+          duration: Snackbar.LENGTH_SHORT,
+        });
+        return;
+      }
 
-        if (response.errorCode) {
-          console.error('Camera error:', {
-            code: response.errorCode,
-            message: response.errorMessage,
-          });
-          // Alert.alert('Error', 'Failed to capture image');
-          Snackbar.show('Failed to capture image', Snackbar.LENGTH_SHORT);
-          return;
-        }
+      if (!response.assets || response.assets.length === 0) {
+        console.error('No image captured');
+        Snackbar.show({
+          text: 'No image captured',
+          duration: Snackbar.LENGTH_SHORT,
+        });
+        return;
+      }
 
-        try {
-          const selectedImage = response.assets[0];
-          console.log('Captured image details:', {
-            uri: selectedImage.uri,
-            type: selectedImage.type || 'image/jpeg',
-            fileSize: selectedImage.fileSize,
-            width: selectedImage.width,
-            height: selectedImage.height,
-          });
+      const selectedImage = response.assets[0];
+      console.log('Captured image details:', {
+        uri: selectedImage.uri,
+        type: selectedImage.type || 'image/jpeg',
+        fileSize: selectedImage.fileSize,
+        width: selectedImage.width,
+        height: selectedImage.height,
+      });
 
-          // Ensure the image has a proper file path
-          const imageUri = selectedImage.uri.startsWith('file://')
-            ? selectedImage.uri
-            : `file://${selectedImage.uri}`;
+      // Ensure the image has a proper file path
+      const imageUri = Platform.OS === 'android'
+        ? selectedImage.uri
+        : selectedImage.uri.startsWith('file://')
+          ? selectedImage.uri
+          : `file://${selectedImage.uri}`;
 
-          setImages([...images, selectedImage]);
+      // Process image similar to image library method
+      const processedImage = {
+        uri: imageUri,
+        type: selectedImage.type || 'image/jpeg',
+        name: `camera_image_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`,
+      };
 
-          // Navigate to OnlineProductSearchScreen with the captured image
-          navigation.navigate('OnlineProductSearch', {
-            imageUri: imageUri,
-            imageType: selectedImage.type || 'image/jpeg',
-            returnToUpload: true,
-          });
-        } catch (error) {
-          console.error('Error processing camera image:', error);
-          // Alert.alert('Error', 'Failed to process the captured image');
-          Snackbar.show(
-            'Failed to process the capture image',
-            Snackbar.LENGTH_SHORT,
-          );
-        }
+      setImages([...images, processedImage]);
+
+      // Navigate to OnlineProductSearchScreen with the captured image
+      console.log('Navigating to OnlineProductSearch with image:', {
+        imageUri,
+        imageType: processedImage.type,
+        returnToUpload: true,
+      });
+      navigation.navigate('OnlineProductSearch', {
+        imageUri: imageUri,
+        imageType: processedImage.type,
+        returnToUpload: true,
+      });
+    } catch (error) {
+      console.error('Error processing camera image:', error);
+      setShowImageOptions(false);
+      Snackbar.show({
+        text: 'Failed to process the captured image: ' + error.message,
+        duration: Snackbar.LENGTH_SHORT,
       });
     }
   };
 
   const handleAddImage = async () => {
-    const hasPermission = await checkAndroidPermissions();
-    if (!hasPermission) {
-      return;
-    }
-
-    const result = await launchImageLibrary({
-      mediaType: 'photo',
-      quality: 0.8,
-      selectionLimit: 0, // Allow multiple images
-      includeBase64: true,
-    });
-
-    if (result.didCancel) {
-      console.log('User cancelled image selection');
-    } else if (result.errorCode) {
-      // Alert.alert('Error', 'Failed to select photos: ' + result.errorMessage);
-      Snackbar.show(
-        'Failed to select photos: ' + result.errorMessage,
-        Snackbar.LENGTH_SHORT,
-      );
-    } else if (result.assets) {
-      const newImages = result.assets.map(image => ({
-        uri: image.uri,
-        type: image.type || 'image/jpeg',
-        name: `product_image_${Date.now()}.jpg`,
-      }));
-
-      if (images.length === 0) {
-        // If this is the first image, navigate to search
-        setImages([...images, ...newImages]);
-        navigation.navigate('OnlineProductSearch', {
-          imageUri: newImages[0].uri,
-          imageType: newImages[0].type || 'image/jpeg',
-          returnToUpload: true,
-        });
-      } else {
-        // For subsequent images, just add them directly
-        setImages([...images, ...newImages]);
+    try {
+      const hasPermission = await checkAndroidPermissions();
+      if (!hasPermission) {
+        console.log('Gallery permission denied');
+        return;
       }
+
+      const options = {
+        mediaType: 'photo',
+        includeBase64: false,
+        maxHeight: 800,
+        maxWidth: 800,
+        quality: 0.7,
+        selectionLimit: 1,
+      };
+
+      console.log('Launching image library with options:', options);
+      const response = await launchImageLibrary(options);
+      
+      // Close the image options modal first
+      setShowImageOptions(false);
+
+      if (response.didCancel) {
+        console.log('User cancelled image picker');
+        return;
+      }
+
+      if (response.errorCode) {
+        console.error('ImagePicker Error:', {
+          code: response.errorCode,
+          message: response.errorMessage,
+        });
+        Snackbar.show({
+          text: 'Failed to pick image: ' + response.errorMessage,
+          duration: Snackbar.LENGTH_SHORT,
+        });
+        return;
+      }
+
+      if (!response.assets || response.assets.length === 0) {
+        console.error('No image selected');
+        Snackbar.show({
+          text: 'No image selected',
+          duration: Snackbar.LENGTH_SHORT,
+        });
+        return;
+      }
+
+      const selectedImage = response.assets[0];
+      console.log('Selected image details:', {
+        uri: selectedImage.uri,
+        type: selectedImage.type || 'image/jpeg',
+        fileSize: selectedImage.fileSize,
+        width: selectedImage.width,
+        height: selectedImage.height,
+      });
+
+      // Ensure the image has a proper file path
+      const imageUri = Platform.OS === 'android'
+        ? selectedImage.uri
+        : selectedImage.uri.startsWith('file://')
+          ? selectedImage.uri
+          : `file://${selectedImage.uri}`;
+
+      // Process image
+      const processedImage = {
+        uri: imageUri,
+        type: selectedImage.type || 'image/jpeg',
+        name: `gallery_image_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`,
+      };
+
+      setImages([...images, processedImage]);
+
+      // Navigate to OnlineProductSearchScreen with the selected image
+      console.log('Navigating to OnlineProductSearch with image:', {
+        imageUri,
+        imageType: processedImage.type,
+        returnToUpload: true,
+      });
+      navigation.navigate('OnlineProductSearch', {
+        imageUri: imageUri,
+        imageType: processedImage.type,
+        returnToUpload: true,
+      });
+    } catch (error) {
+      console.error('Error processing gallery image:', error);
+      setShowImageOptions(false);
+      Snackbar.show({
+        text: 'Failed to process the selected image: ' + error.message,
+        duration: Snackbar.LENGTH_SHORT,
+      });
     }
   };
 
@@ -346,18 +503,28 @@ const ProductUpload = ({navigation, route}) => {
       let errorMessage = 'Failed to search products. ';
 
       if (!navigator.onLine) {
-        errorMessage += 'Please check your internet connection.';
+        errorMessage = 'Please check your internet connection.';
+        Snackbar.show({
+          text: errorMessage,
+          duration: Snackbar.LENGTH_LONG,
+          action: {
+            text: 'RETRY',
+            textColor: '#fff',
+            onPress: () => {
+              // Retry the search
+              searchProducts(imageFile);
+            },
+          },
+        });
       } else if (error.message.includes('timeout')) {
         errorMessage += 'Request timed out. Please try again.';
       } else if (error.message.includes('413')) {
-        errorMessage +=
-          'Image file is too large. Please choose a smaller image.';
+        errorMessage += 'Image file is too large. Please choose a smaller image.';
       } else {
         errorMessage += error.message;
       }
 
       setError(errorMessage);
-      // Alert.alert('Error', errorMessage);
       Snackbar.show(errorMessage, Snackbar.LENGTH_SHORT);
     } finally {
       setLoading(false);
@@ -401,8 +568,11 @@ const ProductUpload = ({navigation, route}) => {
 
   const handleCreateCollection = async () => {
     if (!newCollectionName.trim()) {
-      // Alert.alert('Error', 'Please enter a collection name');
-      Snackbar.show('Please enter a collection name', Snackbar.LENGTH_SHORT);
+      Snackbar.show({
+        text: 'Please enter a collection name',
+        duration: Snackbar.LENGTH_SHORT,
+        position: 'top',
+      });
       return;
     }
 
@@ -412,10 +582,11 @@ const ProductUpload = ({navigation, route}) => {
       // Create form data for the collection
       const formData = new FormData();
       formData.append('collection_name', newCollectionName.trim());
-      formData.append(
-        'description',
-        newCollectionDescription.trim() || newCollectionName.trim(),
-      );
+      
+      // Add description if provided
+      if (newCollectionDescription.trim()) {
+        formData.append('description', newCollectionDescription.trim());
+      }
 
       // Add collection image if available
       if (newCollectionImage) {
@@ -437,8 +608,8 @@ const ProductUpload = ({navigation, route}) => {
         const newCollection = {
           id: response.data.data.id,
           name: response.data.data.collection_name,
-          description: response.data.data.description,
-          image: response.data.data.collection_image,
+          description: response.data.data.description || '',
+          image: response.data.data.collection_image || require('../assets/images/Space_default.jpg'),
         };
 
         setCollections(prevCollections => [newCollection, ...prevCollections]);
@@ -448,55 +619,55 @@ const ProductUpload = ({navigation, route}) => {
         setNewCollectionDescription('');
         setNewCollectionImage(null);
 
-        // Alert.alert('Success', 'Collection created successfully!');
-        Snackbar.show(
-          'Collection created successfully!',
-          Snackbar.LENGTH_SHORT,
-        );
+        Snackbar.show({
+          text: 'Collection created successfully!',
+          backgroundColor: '#4CAF50',
+          textColor: '#FFFFFF',
+          duration: Snackbar.LENGTH_SHORT,
+          position: 'top',
+        });
       }
     } catch (error) {
       console.error('Error creating collection:', error);
-      // Alert.alert(
-      //   'Error',
-      //   error.response?.data?.message || 'Failed to create collection',
-      // );
-      Snackbar.show(
-        error.response?.data?.message || 'Failed to create collection',
-        Snackbar.LENGTH_SHORT,
-      );
+      Snackbar.show({
+        text: error.response?.data?.message || 'Failed to create collection',
+        backgroundColor: '#F44336',
+        textColor: '#FFFFFF',
+        duration: Snackbar.LENGTH_SHORT,
+        position: 'top',
+      });
     }
   };
 
   const handleCreateSpace = async () => {
     if (!newSpaceName.trim()) {
-      // Alert.alert('Error', 'Please enter a space name');
-      Snackbar.show('Please enter a space name', Snackbar.LENGTH_SHORT);
-      return;
-    }
-
-    if (!newSpaceImage) {
-      Snackbar.show('Please select a space image', Snackbar.LENGTH_SHORT);
-      // Alert.alert('Error', 'Please select a space image');
+      Snackbar.show({
+        text: 'Please enter a space name',
+        duration: Snackbar.LENGTH_SHORT,
+        position: 'top',
+      });
       return;
     }
 
     try {
       const token = await AsyncStorage.getItem('accessToken');
-
       // Create form data for the space
       const formData = new FormData();
       formData.append('space_name', newSpaceName.trim());
-      formData.append(
-        'description',
-        newSpaceDescription.trim() || newSpaceName.trim(),
-      );
+      
+      // Add description if provided
+      if (newSpaceDescription.trim()) {
+        formData.append('description', newSpaceDescription.trim());
+      }
 
-      // Add space image (mandatory)
-      formData.append('space_image', {
-        uri: newSpaceImage.uri,
-        type: newSpaceImage.type || 'image/jpeg',
-        name: 'space_image.jpg',
-      });
+      // Add space image if provided
+      if (newSpaceImage) {
+        formData.append('space_image', {
+          uri: newSpaceImage.uri,
+          type: newSpaceImage.type || 'image/jpeg',
+          name: 'space_image.jpg',
+        });
+      }
 
       const response = await axios.post(`${BASE_URL}/spaces`, formData, {
         headers: {
@@ -505,189 +676,209 @@ const ProductUpload = ({navigation, route}) => {
         },
       });
 
-      if (response.data) {
+      if (response.data && response.data.data) {
         console.log('Space creation response:', response.data);
 
+        // Create new space object with the correct ID format
         const newSpace = {
-          id: response.data.data.id,
+          id: response.data.data.space_id.toString(), // Convert space_id to string
           name: response.data.data.space_name || newSpaceName.trim(),
-          description: response.data.data.description,
-          image: response.data.data.space_image,
+          description: response.data.data.description || newSpaceDescription.trim(),
+          image: response.data.data.space_image || require('../assets/images/Space_default.jpg'),
+          space_image: response.data.data.space_image,
+          total_products: 0,
+          owner_id: response.data.data.owner_id
         };
 
         console.log('Created new space:', newSpace);
 
+        // Update spaces list and select the new space
         setSpaces(prevSpaces => [newSpace, ...prevSpaces]);
+        
+        // Important: Wait for state to update before setting selected space
+        await new Promise(resolve => setTimeout(resolve, 100));
         setSelectedSpace(newSpace);
+        
+        // Reset form fields
         setShowSpaceInput(false);
         setNewSpaceName('');
         setNewSpaceDescription('');
         setNewSpaceImage(null);
 
-        // Alert.alert('Success', 'Space created successfully!');
-        Snackbar.show('Space created successfully!', Snackbar.LENGTH_SHORT);
+        Snackbar.show({
+          text: 'Space created successfully!',
+          backgroundColor: '#4CAF50',
+          textColor: '#FFFFFF',
+          duration: Snackbar.LENGTH_SHORT,
+          position: 'top',
+        });
+
+        // Return the created space
+        return newSpace;
       }
     } catch (error) {
       console.error('Error creating space:', error.response?.data || error);
-      // Alert.alert(
-      //   'Error',
-      //   error.response?.data?.message || 'Failed to create space',
-      // );
-      Snackbar.show(
-        error.response?.data?.message || 'Failed to create space',
-        Snackbar.LENGTH_SHORT,
-      );
+      Snackbar.show({
+        text: error.response?.data?.message || 'Failed to create space',
+        backgroundColor: '#F44336',
+        textColor: '#FFFFFF',
+        duration: Snackbar.LENGTH_SHORT,
+        position: 'top',
+      });
+      return null;
     }
   };
 
   const handleUpload = async () => {
     try {
+      // Check for required fields
       if (!productName.trim()) {
-        // Alert.alert('Error', 'Please enter product name');
-        Snackbar.show('Please enter product name', Snackbar.LENGTH_SHORT);
-        return;
-      }
-
-      if (!description.trim()) {
-        // Alert.alert('Error', 'Please enter description');
-        Snackbar.show('Please enter description', Snackbar.LENGTH_SHORT);
-        return;
-      }
-
-      if (!price.trim() || isNaN(parseFloat(price))) {
-        // Alert.alert('Error', 'Please enter a valid price');
-        Snackbar.show('Please enter a valid price', Snackbar.LENGTH_SHORT);
-        return;
-      }
-
-      if (!selectedSpace?.id) {
-        // Alert.alert('Error', 'Please select a space');
-        Snackbar.show('Please select a space', Snackbar.LENGTH_SHORT);
-        return;
-      }
-
-      if (!selectedCollections?.length) {
-        // Alert.alert('Error', 'Please select at least one collection');
-        Snackbar.show(
-          'Please select at least one collection',
-          Snackbar.LENGTH_SHORT,
-        );
-        return;
-      }
-
-      if (!images?.length) {
-        // Alert.alert('Error', 'Please add at least one image');
-        Snackbar.show('Please add at least one image', Snackbar.LENGTH_SHORT);
-        return;
-      }
-
-      const token = await AsyncStorage.getItem('accessToken');
-      if (!token) {
-        throw new Error('Authentication token not found');
-      }
-
-      const formData = new FormData();
-      formData.append('product_name', productName.trim());
-      formData.append('description', description.trim());
-      formData.append('price', price.toString());
-      formData.append('space_id', selectedSpace.id.toString());
-
-      // Append collection IDs as collection_id[0], collection_id[1], etc.
-      selectedCollections.forEach((collection, index) => {
-        if (collection?.id) {
-          formData.append(`collection_id[${index}]`, collection.id.toString());
-        }
-      });
-
-      // Append all images as 'image'
-      images.forEach((image, index) => {
-        if (image?.uri) {
-          formData.append('image', {
-            uri: image.uri,
-            type: image.type || 'image/jpeg',
-            name: `image_${index}.jpg`,
-          });
-        }
-      });
-
-      console.log('Uploading product with data:', {
-        product_name: productName.trim(),
-        description: description.trim(),
-        price: price,
-        space_id: selectedSpace.id,
-        collection_ids: selectedCollections.map(c => c?.id).filter(Boolean),
-        number_of_images: images.length,
-      });
-
-      const response = await axios.post(`${BASE_URL}/products`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      console.log('Upload response:', response.data);
-
-      if (response.data && response.data.type === 'success') {
-        // Alert.alert('Success', 'Product uploaded successfully!', [
-        //   {
-        //     text: 'OK',
-        //     onPress: () => {
-        //       // Reset form
-        //       setImages([]);
-        //       setProductName('');
-        //       setDescription('');
-        //       setPrice('');
-        //       setSelectedSpace(null);
-        //       setSelectedCollections([]);
-        //       // Navigate back to space
-        //       navigation.navigate('IndividualSpace', {
-        //         spaceId: selectedSpace.id.toString(),
-        //       });
-        //     },
-        //   },
-        // ]);
-
         Snackbar.show({
-          text: 'Product uploaded successfully',
-          action: {
-            text: 'OK',
-            onPress: () => {
-              setImages([]);
-              setProductName('');
-              setDescription('');
-              setPrice('');
-              setSelectedSpace(null);
-              setSelectedCollections([]);
-              // Navigate back to space
-              navigation.navigate('IndividualSpace', {
-                spaceId: selectedSpace.id.toString(),
-              });
-            },
-          },
+          text: 'Please enter a product name',
+          duration: Snackbar.LENGTH_SHORT,
         });
-      } else {
-        throw new Error('Upload failed: Invalid response from server');
+        return;
+      }
+
+      if (images.length === 0) {
+        Snackbar.show({
+          text: 'Please select at least one image',
+          duration: Snackbar.LENGTH_SHORT,
+        });
+        return;
+      }
+
+      setIsLoading(true);
+      const token = await AsyncStorage.getItem('accessToken');
+      const formData = new FormData();
+
+      // Add product name
+      formData.append('product_name', productName.trim());
+      
+      // Add the image
+      const imageFile = {
+        uri: images[0].uri,
+        type: 'image/jpeg',
+        name: 'image.jpg'
+      };
+      formData.append('image', imageFile);
+
+      // Add optional fields if they exist
+      if (description) {
+        formData.append('description', description.trim());
+      }
+      
+      if (price) {
+        formData.append('price', price.toString());
+      }
+
+      // Handle space ID
+      const spaceId = selectedSpace?.id;
+      if (spaceId) {
+        console.log('Adding space_id to formData:', spaceId);
+        formData.append('space_id', spaceId.toString());
+      }
+
+      // Handle collections
+      if (selectedCollections.length > 0) {
+        const collectionIds = selectedCollections.map(c => c.id);
+        console.log('Adding collection_ids to formData:', collectionIds);
+        formData.append('collection_ids', JSON.stringify(collectionIds));
+      }
+
+      console.log('Uploading product:', {
+        product_name: productName.trim(),
+        imageUri: images[0].uri,
+        space_id: spaceId,
+        collection_ids: selectedCollections.map(c => c.id)
+      });
+
+      const response = await axios.post(
+        `${BASE_URL}/products`,
+        formData,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      if (response.status === 200 || response.status === 201) {
+        Snackbar.show({
+          text: 'Product uploaded successfully!',
+          backgroundColor: '#4CAF50',
+          textColor: '#FFFFFF',
+          duration: Snackbar.LENGTH_SHORT,
+        });
+
+        // Wait for Snackbar to show before navigating
+        setTimeout(() => {
+          if (spaceId) {
+            navigation.replace('IndividualSpace', {
+              spaceId: selectedSpace.id,
+              spaceName: selectedSpace.name,
+              spaceImage: selectedSpace.image || selectedSpace.space_image,
+              description: selectedSpace.description,
+              totalProducts: selectedSpace.total_products,
+              ownerId: selectedSpace.owner_id
+            });
+          } else {
+            navigation.replace('Home');
+          }
+        }, 1000);
       }
     } catch (error) {
-      console.error(
-        'Error uploading product:',
-        error.response?.data || error.message,
-      );
-      // Alert.alert(
-      //   'Error',
-      //   error.response?.data?.message ||
-      //     error.message ||
-      //     'Failed to upload product',
-      // );
-      Snackbar.show(
-        error.response?.data?.message ||
-          error.message ||
-          'Failed to upload product',
-        Snackbar.LENGTH_SHORT,
-      );
+      console.error('Upload error:', error);
+      Snackbar.show({
+        text: error.response?.data?.message || 'Failed to upload product',
+        duration: Snackbar.LENGTH_SHORT,
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  // Enable upload only when image and title are present
+  const isUploadEnabled = useMemo(() => {
+    return productName.trim().length > 0 && images.length > 0;
+  }, [productName, images]);
+
+  const formatProductName = (text) => {
+    if (!text) {
+      return '';
+    }
+
+    // Split into chunks of 25 characters, maintaining word boundaries
+    const words = text.split(' ');
+    let lines = [];
+    let currentLine = '';
+    let currentLength = 0;
+
+    words.forEach(word => {
+      if (currentLength + word.length + 1 <= 25) {
+        currentLine += (currentLine.length ? ' ' : '') + word;
+        currentLength += word.length + 1; // +1 for space
+      } else {
+        if (currentLine.length) {
+          lines.push(currentLine);
+        }
+        currentLine = word;
+        currentLength = word.length + 1;
+      }
+    });
+    if (currentLine.length) {
+      lines.push(currentLine);
+    }
+
+    return lines.join('\n');
+  };
+
+  const handleProductNameChange = (text) => {
+    const formattedText = formatProductName(text);
+    setProductName(formattedText);
+  };
+
   const fetchSpaces = async () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
@@ -700,20 +891,25 @@ const ProductUpload = ({navigation, route}) => {
 
       if (response.data && Array.isArray(response.data.data)) {
         const spacesData = response.data.data.map(space => ({
-          id: space.id || space.space_id,
-          name: space.space_name || space.name || 'Unnamed Space',
-          description: space.description || '',
-          space_image: space.space_image || null,
+          id: space.space_id.toString(), // Convert space_id to string
+          name: space.space_name,
+          description: space.description,
+          image: space.space_image,
+          space_image: space.space_image,
           total_products: space.total_products || 0,
-          created_at: space.created_at,
+          owner_id: space.owner_id
         }));
-
-        console.log('Processed Spaces:', spacesData);
         setSpaces(spacesData);
       }
     } catch (error) {
-      console.error('Error fetching spaces:', error.response?.data || error);
-      setSpaces([]);
+      console.error('Error fetching spaces:', error);
+      Snackbar.show({
+        text: 'Failed to load spaces',
+        backgroundColor: '#F44336',
+        textColor: '#FFFFFF',
+        duration: Snackbar.LENGTH_SHORT,
+        position: 'top',
+      });
     }
   };
   const fetchCollections = async () => {
@@ -745,7 +941,6 @@ const ProductUpload = ({navigation, route}) => {
       }
     } catch (error) {
       console.error('Error fetching collections:', error);
-      // Alert.alert('Error', 'An error occurred while fetching collections.');
       Snackbar.show(
         'An error occurred while fetching collections.',
         Snackbar.LENGTH_SHORT,
@@ -769,11 +964,393 @@ const ProductUpload = ({navigation, route}) => {
     });
   };
 
+  const handleDeleteSpace = async spaceId => {
+    try {
+      Snackbar.show({
+        text: 'This feature is not available yet',
+        backgroundColor: '#F44336',
+        textColor: '#FFFFFF',
+        duration: Snackbar.LENGTH_SHORT,
+        position: 'top',
+      });
+    } catch (error) {
+      console.error('Error deleting space:', error);
+      Snackbar.show({
+        text: 'Failed to delete space',
+        backgroundColor: '#F44336',
+        textColor: '#FFFFFF',
+        duration: Snackbar.LENGTH_SHORT,
+        position: 'top',
+      });
+    }
+  };
+
+  useEffect(() => {
+    const fetchProductDetails = async () => {
+      const productId = route.params?.productId || route.params?.prefillData?.product_id;
+      
+      if (productId) {
+        try {
+          const token = await AsyncStorage.getItem('accessToken');
+          const response = await axios.get(`${BASE_URL}/products/${productId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          const productData = response.data.data;
+          console.log('Fetched product details:', JSON.stringify(productData, null, 2));
+          console.log('Available collections:', JSON.stringify(collections, null, 2));
+
+          // Prefill basic product details
+          setProductName(
+            productData.product_name || 
+            productData.title || 
+            route.params?.prefillData?.title || 
+            ''
+          );
+          setDescription(productData.description || '');
+          setPrice(productData.price ? productData.price.toString() : '');
+
+          // Prefill space
+          if (productData.space_id) {
+            const spaceToSelect = spaces.find(
+              space => space.id === productData.space_id.toString()
+            );
+            if (spaceToSelect) {
+              setSelectedSpace(spaceToSelect);
+            }
+          }
+
+          // Prefill collections
+          const collectionsToSelect = [];
+          
+          // Try to match collections from product data
+          if (productData.collections && productData.collections.length > 0) {
+            productData.collections.forEach(collection => {
+              const matchedCollection = collections.find(
+                c => c.id === collection.id.toString() || 
+                     c.name.toLowerCase() === collection.name.toLowerCase()
+              );
+              if (matchedCollection) {
+                collectionsToSelect.push(matchedCollection);
+              }
+            });
+          }
+
+          // Fallback to prefillData collections
+          if (collectionsToSelect.length === 0 && route.params?.prefillData) {
+            const prefillCollections = route.params.prefillData.collections || 
+                                       route.params.prefillData.collection_details || 
+                                       [];
+            
+            const mappedCollections = prefillCollections.map(collectionId => {
+              // Handle different possible input formats
+              if (typeof collectionId === 'object') {
+                // If it's a full collection object
+                return collections.find(
+                  c => c.id === collectionId.id.toString() || 
+                       c.name.toLowerCase() === collectionId.name.toLowerCase()
+                );
+              } else {
+                // If it's just an ID
+                return collections.find(c => c.id === collectionId.toString());
+              }
+            }).filter(Boolean);
+
+            collectionsToSelect.push(...mappedCollections);
+          }
+
+          if (collectionsToSelect.length > 0) {
+            console.log('Selected collections:', JSON.stringify(collectionsToSelect, null, 2));
+            setSelectedCollections(collectionsToSelect);
+          } else {
+            console.warn('No collections could be matched');
+          }
+
+          // Prefill images
+          const images = [];
+          if (productData.primary_image_url) {
+            images.push({
+              uri: productData.primary_image_url,
+              type: 'image/jpeg',
+              name: `product_image_${productId}_primary.jpg`
+            });
+          }
+
+          if (productData.additional_images && productData.additional_images.length > 0) {
+            const additionalImages = productData.additional_images.map((imageUrl, index) => ({
+              uri: imageUrl,
+              type: 'image/jpeg',
+              name: `product_image_${productId}_${index}.jpg`
+            }));
+            images.push(...additionalImages);
+          }
+
+          // Fallback to prefillData images
+          if (images.length === 0 && route.params?.prefillData?.images) {
+            const prefillImages = route.params.prefillData.images.map((imageUrl, index) => ({
+              uri: imageUrl,
+              type: 'image/jpeg',
+              name: `prefill_image_${index}.jpg`
+            }));
+            images.push(...prefillImages);
+          }
+
+          if (images.length > 0) {
+            setImages(images);
+          }
+        } catch (error) {
+          console.error('Error fetching product details:', error);
+          
+          // Fallback to prefillData if API fetch fails
+          const prefillData = route.params?.prefillData;
+          if (prefillData) {
+            console.log('Falling back to prefill data:', JSON.stringify(prefillData, null, 2));
+
+            // Prefill basic product details
+            setProductName(
+              prefillData.title || 
+              prefillData.product_name || 
+              ''
+            );
+            setDescription(prefillData.description || '');
+            setPrice(prefillData.price ? prefillData.price.toString() : '');
+
+            // Prefill space
+            if (prefillData.space_id) {
+              const spaceToSelect = spaces.find(
+                space => space.id === prefillData.space_id.toString()
+              );
+              if (spaceToSelect) {
+                setSelectedSpace(spaceToSelect);
+              }
+            }
+
+            // Prefill collections
+            const prefillCollections = prefillData.collections || 
+                                       prefillData.collection_details || 
+                                       [];
+            
+            if (prefillCollections.length > 0) {
+              const collectionsToSelect = prefillCollections.map(
+                collectionId => collections.find(
+                  c => c.id === (typeof collectionId === 'object' ? 
+                    collectionId.id : 
+                    collectionId
+                  )
+                )
+              ).filter(Boolean);
+              
+              if (collectionsToSelect.length > 0) {
+                console.log('Fallback selected collections:', collectionsToSelect);
+                setSelectedCollections(collectionsToSelect);
+              }
+            }
+
+            // Prefill images
+            if (prefillData.images && prefillData.images.length > 0) {
+              const prefillImages = prefillData.images.map((imageUrl, index) => ({
+                uri: imageUrl,
+                type: 'image/jpeg',
+                name: `prefill_image_${index}.jpg`
+              }));
+              setImages(prefillImages);
+            }
+          }
+
+          Snackbar.show({
+            text: 'Failed to load product details',
+            duration: Snackbar.LENGTH_SHORT,
+          });
+        }
+      }
+    };
+
+    // Only run prefill after spaces and collections are loaded
+    if (spaces.length > 0 && collections.length > 0) {
+      fetchProductDetails();
+    }
+  }, [spaces, collections, route.params?.productId, route.params?.prefillData]);
+
+  useEffect(() => {
+    const fetchProductDetails = async () => {
+      const productId = route.params?.productId || route.params?.prefillData?.product_id;
+      
+      if (productId) {
+        try {
+          const token = await AsyncStorage.getItem('accessToken');
+          const response = await axios.get(`${BASE_URL}/products/${productId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          const productData = response.data.data;
+          console.log('Fetched product details:', JSON.stringify(productData, null, 2));
+
+          // Prefill basic product details
+          setProductName(
+            productData.product_name || 
+            productData.title || 
+            route.params?.prefillData?.title || 
+            ''
+          );
+          setDescription(productData.description || '');
+          setPrice(productData.price ? productData.price.toString() : '');
+
+          // Prefill space
+          if (productData.space_id) {
+            const spaceToSelect = spaces.find(
+              space => space.id === productData.space_id.toString()
+            );
+            if (spaceToSelect) {
+              setSelectedSpace(spaceToSelect);
+            }
+          }
+
+          // Prefill collections
+          const collectionsToSelect = [];
+          
+          // Try to match collections from product data
+          if (productData.collections && productData.collections.length > 0) {
+            productData.collections.forEach(collection => {
+              const matchedCollection = collections.find(
+                c => c.id === collection.id.toString() || 
+                     c.name.toLowerCase() === collection.name.toLowerCase()
+              );
+              if (matchedCollection) {
+                collectionsToSelect.push(matchedCollection);
+              }
+            });
+          }
+
+          // Fallback to prefillData collections if API fetch fails
+          if (collectionsToSelect.length === 0 && route.params?.prefillData?.collections) {
+            const prefillCollections = route.params.prefillData.collections.map(
+              collectionId => collections.find(
+                c => c.id === (typeof collectionId === 'object' ? 
+                  collectionId.id : 
+                  collectionId
+                )
+              )
+            ).filter(Boolean);
+            
+            collectionsToSelect.push(...prefillCollections);
+          }
+
+          if (collectionsToSelect.length > 0) {
+            console.log('Selected collections:', collectionsToSelect);
+            setSelectedCollections(collectionsToSelect);
+          }
+
+          // Prefill images
+          const images = [];
+          if (productData.primary_image_url) {
+            images.push({
+              uri: productData.primary_image_url,
+              type: 'image/jpeg',
+              name: `product_image_${productId}_primary.jpg`
+            });
+          }
+
+          if (productData.additional_images && productData.additional_images.length > 0) {
+            const additionalImages = productData.additional_images.map((imageUrl, index) => ({
+              uri: imageUrl,
+              type: 'image/jpeg',
+              name: `product_image_${productId}_${index}.jpg`
+            }));
+            images.push(...additionalImages);
+          }
+
+          // Fallback to prefillData images
+          if (images.length === 0 && route.params?.prefillData?.images) {
+            const prefillImages = route.params.prefillData.images.map((imageUrl, index) => ({
+              uri: imageUrl,
+              type: 'image/jpeg',
+              name: `prefill_image_${index}.jpg`
+            }));
+            images.push(...prefillImages);
+          }
+
+          if (images.length > 0) {
+            setImages(images);
+          }
+        } catch (error) {
+          console.error('Error fetching product details:', error);
+          
+          // Fallback to prefillData if API fetch fails
+          const prefillData = route.params?.prefillData;
+          if (prefillData) {
+            console.log('Falling back to prefill data:', JSON.stringify(prefillData, null, 2));
+
+            // Prefill basic product details
+            setProductName(
+              prefillData.title || 
+              prefillData.product_name || 
+              ''
+            );
+            setDescription(prefillData.description || '');
+            setPrice(prefillData.price ? prefillData.price.toString() : '');
+
+            // Prefill space
+            if (prefillData.space_id) {
+              const spaceToSelect = spaces.find(
+                space => space.id === prefillData.space_id.toString()
+              );
+              if (spaceToSelect) {
+                setSelectedSpace(spaceToSelect);
+              }
+            }
+
+            // Prefill collections
+            if (prefillData.collections && prefillData.collections.length > 0) {
+              const collectionsToSelect = prefillData.collections.map(
+                collectionId => collections.find(
+                  c => c.id === (typeof collectionId === 'object' ? 
+                    collectionId.id : 
+                    collectionId
+                  )
+                )
+              ).filter(Boolean);
+              
+              if (collectionsToSelect.length > 0) {
+                setSelectedCollections(collectionsToSelect);
+              }
+            }
+
+            // Prefill images
+            if (prefillData.images && prefillData.images.length > 0) {
+              const prefillImages = prefillData.images.map((imageUrl, index) => ({
+                uri: imageUrl,
+                type: 'image/jpeg',
+                name: `prefill_image_${index}.jpg`
+              }));
+              setImages(prefillImages);
+            }
+          }
+
+          Snackbar.show({
+            text: 'Failed to load product details',
+            duration: Snackbar.LENGTH_SHORT,
+          });
+        }
+      }
+    };
+
+    // Only run prefill after spaces and collections are loaded
+    if (spaces.length > 0 && collections.length > 0) {
+      fetchProductDetails();
+    }
+  }, [spaces, collections, route.params?.productId, route.params?.prefillData]);
+
   useEffect(() => {
     if (route.params?.prefillData) {
       const {title, price, description, productImage, uploadedImage} =
         route.params.prefillData;
-      setProductName(title);
+      setProductName(title || productImage || '');
       // Ensure price is a clean number without currency symbols
       setPrice(price ? price.toString().replace(/[^0-9.]/g, '') : '');
       setDescription(description);
@@ -802,6 +1379,10 @@ const ProductUpload = ({navigation, route}) => {
       }
     }
   }, [route.params?.prefillData]);
+
+  useEffect(() => {
+    setIsValid(productName.trim() !== '' && images.length > 0);
+  }, [productName, images]);
 
   const formatTitle = title => {
     if (!title) {
@@ -975,31 +1556,29 @@ const ProductUpload = ({navigation, route}) => {
 
         {/* Form Fields */}
         <View style={styles.formContainer}>
-          <Text style={styles.label}>Product Name</Text>
+          <Text style={styles.label}>Product Name *</Text>
           <TextInput
-            style={[styles.input, styles.titleInput]}
+            style={styles.input}
+            placeholder="Product Title *"
             value={productName}
-            onChangeText={setProductName}
-            placeholder="Enter product name"
-            multiline
-            numberOfLines={2}
+            onChangeText={handleProductNameChange}
           />
 
           <Text style={styles.label}>Description</Text>
           <TextInput
-            style={[styles.input, styles.textArea]}
+            style={styles.input}
+            placeholder="Description (Optional)"
             value={description}
             onChangeText={setDescription}
-            placeholder="Enter product description"
             multiline
-            numberOfLines={4}
           />
+
           <Text style={styles.label}>Price</Text>
           <TextInput
             style={styles.input}
+            placeholder="Price (Optional)"
             value={price}
             onChangeText={setPrice}
-            placeholder="Enter price"
             keyboardType="numeric"
           />
 
@@ -1017,37 +1596,18 @@ const ProductUpload = ({navigation, route}) => {
                     styles.spaceItem,
                     selectedSpace?.id === space.id && styles.selectedSpaceItem,
                   ]}
-                  onPress={() => setSelectedSpace(space)}>
-                  <View style={styles.spaceItemContent}>
-                    {space.space_image ? (
-                      <Image
-                        source={{uri: space.space_image}}
-                        style={styles.spaceItemImage}
-                        onError={e =>
-                          console.log('Space image load error:', e.nativeEvent)
-                        }
-                      />
-                    ) : (
-                      <Image
-                        source={require('../assets/images/Space_default.jpg')}
-                        style={styles.spaceItemImage}
-                      />
-                    )}
-                    <View style={styles.spaceItemTextContainer}>
-                      <Text
-                        style={[
-                          styles.spaceText,
-                          selectedSpace?.id === space.id &&
-                            styles.selectedSpaceText,
-                        ]}>
-                        {space.name}
-                      </Text>
-                      <Text style={styles.spaceItemCount}>
-                        {space.total_products}{' '}
-                        {space.total_products === 1 ? 'Item' : 'Items'}
-                      </Text>
-                    </View>
-                  </View>
+                  onPress={() => {
+                    console.log('Selecting space:', space);
+                    setSelectedSpace(space);
+                  }}>
+                  <Text 
+                    style={[
+                      styles.spaceText,
+                      selectedSpace?.id === space.id && styles.selectedSpaceText
+                    ]}
+                  >
+                    {space.name}
+                  </Text>
                 </TouchableOpacity>
               ))}
               <TouchableOpacity
@@ -1060,7 +1620,7 @@ const ProductUpload = ({navigation, route}) => {
 
           {/* Collections Section */}
           <View style={styles.spacesSection}>
-            <Text style={styles.label}>Collections (Required)</Text>
+            <Text style={styles.label}>Collections (Optional)</Text>
             {loadingCollections ? (
               renderSkeleton()
             ) : (
@@ -1077,22 +1637,13 @@ const ProductUpload = ({navigation, route}) => {
                         styles.selectedCollectionItem,
                     ]}
                     onPress={() => toggleCollection(collection)}>
-                    <Image
-                      source={{uri: collection.image}}
-                      style={styles.collectionItemImage}
-                      onError={e =>
-                        console.log(
-                          'Collection image load error:',
-                          e.nativeEvent,
-                        )
-                      }
-                    />
-                    <Text
+                    <Text 
                       style={[
                         styles.collectionText,
                         selectedCollections.some(c => c.id === collection.id) &&
-                          styles.selectedCollectionText,
-                      ]}>
+                          styles.selectedCollectionText
+                      ]}
+                    >
                       {collection.name}
                     </Text>
                   </TouchableOpacity>
@@ -1106,8 +1657,24 @@ const ProductUpload = ({navigation, route}) => {
             )}
           </View>
 
-          <TouchableOpacity style={styles.uploadButton} onPress={handleUpload}>
-            <Text style={styles.uploadButtonText}>Upload Product</Text>
+          <TouchableOpacity 
+            style={[
+              styles.uploadButton,
+              (!isUploadEnabled || isLoading) && styles.disabledButton
+            ]}
+            onPress={() => {
+              console.log('Upload button pressed');
+              handleUpload();
+            }}
+            disabled={!isUploadEnabled || isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="white" size="small" />
+            ) : (
+              <Text style={styles.uploadButtonText}>
+                {route.params?.prefillData ? 'Update Product' : 'Upload Product'}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -1149,10 +1716,10 @@ const ProductUpload = ({navigation, route}) => {
       {/* Add Space Modal */}
       <Modal visible={showSpaceInput} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, {width: '90%'}]}>
+          <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Create New Space</Text>
 
-            {/* Space Image */}
+            {/* Space Image Picker */}
             <TouchableOpacity
               style={[
                 styles.imagePickerButton,
@@ -1171,19 +1738,15 @@ const ProductUpload = ({navigation, route}) => {
                     selectionLimit: 1,
                   });
 
-                  if (
-                    !result.didCancel &&
-                    !result.errorCode &&
-                    result.assets?.[0]
-                  ) {
+                  if (!result.didCancel && !result.errorCode && result.assets?.[0]) {
                     setNewSpaceImage(result.assets[0]);
                   }
                 } catch (error) {
-                  // Alert.alert('Error', 'Failed to select photo');
-                  Snackbar.show(
-                    'Failed to select photo',
-                    Snackbar.LENGTH_SHORT,
-                  );
+                  console.error('Error picking image:', error);
+                  Snackbar.show({
+                    text: 'Failed to select photo',
+                    duration: Snackbar.LENGTH_SHORT,
+                  });
                 }
               }}>
               {newSpaceImage ? (
@@ -1193,7 +1756,7 @@ const ProductUpload = ({navigation, route}) => {
                 />
               ) : (
                 <Text style={styles.imagePickerText}>
-                  Add Space Image (Required)
+                  Add Space Image (Optional)
                 </Text>
               )}
             </TouchableOpacity>
@@ -1233,11 +1796,11 @@ const ProductUpload = ({navigation, route}) => {
                 style={[
                   styles.modalButton,
                   styles.createButton,
-                  (!newSpaceName.trim() || !newSpaceImage) &&
+                  (!newSpaceName.trim()) &&
                     styles.disabledButton,
                 ]}
                 onPress={handleCreateSpace}
-                disabled={!newSpaceName.trim() || !newSpaceImage}>
+                disabled={!newSpaceName.trim()}>
                 <Text style={styles.createButtonText}>Create</Text>
               </TouchableOpacity>
             </View>
@@ -1246,30 +1809,39 @@ const ProductUpload = ({navigation, route}) => {
       </Modal>
 
       {/* Add Collection Modal */}
-      <Modal
-        visible={showCollectionInput}
-        transparent={true}
-        animationType="slide">
+      <Modal visible={showCollectionInput} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Create New Collection</Text>
 
+            {/* Collection Image Picker */}
             <TouchableOpacity
-              style={styles.imagePickerButton}
+              style={[
+                styles.imagePickerButton,
+                !newCollectionImage && styles.mandatoryField,
+              ]}
               onPress={async () => {
                 try {
+                  const hasPermission = await checkAndroidPermissions();
+                  if (!hasPermission) {
+                    return;
+                  }
+
                   const result = await launchImageLibrary({
                     mediaType: 'photo',
                     quality: 0.8,
                     selectionLimit: 1,
-                    includeBase64: true,
                   });
 
-                  if (!result.didCancel && result.assets?.[0]) {
+                  if (!result.didCancel && !result.errorCode && result.assets?.[0]) {
                     setNewCollectionImage(result.assets[0]);
                   }
                 } catch (error) {
                   console.error('Error picking image:', error);
+                  Snackbar.show({
+                    text: 'Failed to select photo',
+                    duration: Snackbar.LENGTH_SHORT,
+                  });
                 }
               }}>
               {newCollectionImage ? (
@@ -1278,20 +1850,25 @@ const ProductUpload = ({navigation, route}) => {
                   style={styles.previewImage}
                 />
               ) : (
-                <Text style={styles.imagePickerText}>Add Collection Image</Text>
+                <Text style={styles.imagePickerText}>
+                  Add Collection Image (Optional)
+                </Text>
               )}
             </TouchableOpacity>
 
             <TextInput
-              style={styles.modalInput}
-              placeholder="Collection Name"
+              style={[
+                styles.modalInput,
+                !newCollectionName.trim() && styles.mandatoryField,
+              ]}
+              placeholder="Collection Name (Required)"
               value={newCollectionName}
               onChangeText={setNewCollectionName}
             />
 
             <TextInput
               style={[styles.modalInput, styles.textArea]}
-              placeholder="Collection Description"
+              placeholder="Collection Description (Optional)"
               value={newCollectionDescription}
               onChangeText={setNewCollectionDescription}
               multiline
@@ -1311,8 +1888,14 @@ const ProductUpload = ({navigation, route}) => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.modalButton, styles.createButton]}
-                onPress={handleCreateCollection}>
+                style={[
+                  styles.modalButton,
+                  styles.createButton,
+                  (!newCollectionName.trim()) &&
+                    styles.disabledButton,
+                ]}
+                onPress={handleCreateCollection}
+                disabled={!newCollectionName.trim()}>
                 <Text style={styles.createButtonText}>Create</Text>
               </TouchableOpacity>
             </View>
@@ -1324,6 +1907,8 @@ const ProductUpload = ({navigation, route}) => {
     </View>
   );
 };
+
+export default ProductUploadScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -1441,7 +2026,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     alignItems: 'center',
-    justifyContent: 'center',
   },
   cameraButton: {
     flex: 0.35,
@@ -1466,24 +2050,17 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 15,
     fontSize: 16,
-    color: '#000',
-  },
-  titleInput: {
-    minHeight: 60,
     textAlignVertical: 'top',
-    lineHeight: 24,
+    minHeight: 50,
   },
   textArea: {
     height: 100,
     textAlignVertical: 'top',
   },
-  collectionTextArea: {
-    height: 120,
-  },
   label: {
     fontSize: 16,
-    color: '#666',
-    marginBottom: 5,
+    color: '#333',
+    marginBottom: 8,
   },
   spacesSection: {
     marginBottom: 20,
@@ -1507,12 +2084,12 @@ const styles = StyleSheet.create({
     borderColor: '#8b4ae2',
   },
   spaceText: {
-    color: '#666',
+    color: '#000',
     fontSize: 14,
     textAlign: 'center',
   },
   selectedSpaceText: {
-    color: '#fff',
+    color: 'white',
   },
   addSpaceButton: {
     paddingHorizontal: 15,
@@ -1571,7 +2148,7 @@ const styles = StyleSheet.create({
   cancelButton: {
     backgroundColor: '#f0f0f0',
   },
-  addButton: {
+  createButton: {
     backgroundColor: '#8b4ae2',
   },
   cancelButtonText: {
@@ -1579,10 +2156,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  addButtonText: {
+  createButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '500',
+  },
+  imagePickerButton: {
+    width: '100%',
+    height: 120,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    marginBottom: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 5,
+  },
+  imagePickerText: {
+    color: '#666',
+  },
+  mandatoryField: {
+    borderColor: '#ddd',
+  },
+  disabledButton: {
+    backgroundColor: '#cccccc',
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
   },
   uploadButton: {
     backgroundColor: '#8b4ae2',
@@ -1641,108 +2247,98 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '600',
   },
-  imagePickerButton: {
-    width: '100%',
-    height: 120,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 5,
-    marginBottom: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8f8f8',
+  imageTitle: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    color: 'white',
+    padding: 5,
+    textAlign: 'center',
+    fontSize: 12,
   },
-  previewImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 5,
-  },
-  imagePickerText: {
-    color: '#666',
-  },
-  mandatoryField: {
-    borderColor: '#ff6b6b',
-    borderWidth: 1,
-  },
-  disabledButton: {
-    backgroundColor: '#cccccc',
-  },
-  spaceItemContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-  },
-  spaceItemImage: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    marginRight: 8,
-  },
-  spaceItemTextContainer: {
+  modalContainer: {
     flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  spaceItemCount: {
-    fontSize: 12,
-    color: '#999',
-  },
-  searchOnlineButton: {
-    margin: 16,
-    padding: 12,
-    backgroundColor: '#6B46C1',
-    borderRadius: 8,
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    width: '80%',
     alignItems: 'center',
   },
-  searchOnlineButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  imagePreviewContainer: {
-    width: '100%',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    overflow: 'hidden',
-    marginBottom: 10,
-  },
-  imagePreviewWrapper: {
-    width: 100,
-    height: 100,
-    position: 'relative',
-    marginRight: 10,
-  },
-  imagePreview: {
-    width: '100%',
-    height: '100%',
-  },
-  imagePlaceholder: {
-    width: '100%',
-    aspectRatio: 1,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  placeholderText: {
-    color: '#666',
-    fontSize: 16,
-  },
-  removeImageButton: {
-    position: 'absolute',
-    right: 10,
-    top: 10,
-    backgroundColor: 'rgba(255, 0, 0, 0.8)',
-    borderRadius: 20,
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 3,
-  },
-  removeImageText: {
-    color: 'white',
-    fontSize: 24,
+  modalTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 15,
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 15,
+  },
+  modalButton: {
+    backgroundColor: '#6B46C1',
+    padding: 10,
+    borderRadius: 5,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  listItem: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+  },
+  selectedListItem: {
+    backgroundColor: '#f0e6ff',
+  },
+  listItemTitle: {
+    fontSize: 16,
+    color: '#333',
+  },
+  closeButton: {
+    marginTop: 15,
+    padding: 10,
+    backgroundColor: '#6B46C1',
+    borderRadius: 5,
+    width: '100%',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    width: '90%',
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center',
   },
   collectionSkeletonCard: {
     backgroundColor: '#fff',
@@ -1788,12 +2384,12 @@ const styles = StyleSheet.create({
     borderColor: '#8b4ae2',
   },
   collectionText: {
-    color: '#666',
+    color: '#000',
     fontSize: 14,
     textAlign: 'center',
   },
   selectedCollectionText: {
-    color: '#fff',
+    color: 'white',
   },
   collectionItemImage: {
     width: 30,
@@ -1801,6 +2397,629 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     marginRight: 8,
   },
+  createButton: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginLeft: 10,
+  },
+  createButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  placeholderText: {
+    color: '#888',
+    fontStyle: 'italic',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 12,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  imageUploadContainer: {
+    marginVertical: 15,
+    padding: 15,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+  },
+  imagePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E6E6FA',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  imagePickerButtonText: {
+    color: '#6B46C1',
+    marginLeft: 10,
+    fontWeight: '600',
+  },
+  imagePreviewContainer: {
+    marginTop: 15,
+    flexDirection: 'row',
+  },
+  imagePreviewWrapper: {
+    position: 'relative',
+    marginRight: 10,
+  },
+  imagePreview: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 15,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageTitle: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    color: 'white',
+    padding: 5,
+    textAlign: 'center',
+    fontSize: 12,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    width: '80%',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 15,
+  },
+  modalButton: {
+    backgroundColor: '#6B46C1',
+    padding: 10,
+    borderRadius: 5,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  listItem: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+  },
+  selectedListItem: {
+    backgroundColor: '#f0e6ff',
+  },
+  listItemTitle: {
+    fontSize: 16,
+    color: '#333',
+  },
+  closeButton: {
+    marginTop: 15,
+    padding: 10,
+    backgroundColor: '#6B46C1',
+    borderRadius: 5,
+    width: '100%',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    width: '90%',
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  collectionSkeletonCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 16,
+    padding: 12,
+    flexDirection: 'row',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  collectionSkeletonImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#E1E1E1',
+  },
+  collectionSkeletonContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  collectionSkeletonText: {
+    height: 20,
+    width: '60%',
+    backgroundColor: '#E1E1E1',
+    borderRadius: 4,
+  },
+  collectionItem: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  selectedCollectionItem: {
+    backgroundColor: '#8b4ae2',
+    borderColor: '#8b4ae2',
+  },
+  collectionText: {
+    color: '#000',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  selectedCollectionText: {
+    color: 'white',
+  },
+  collectionItemImage: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginRight: 8,
+  },
+  createButton: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginLeft: 10,
+  },
+  createButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  placeholderText: {
+    color: '#888',
+    fontStyle: 'italic',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 12,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  imageUploadContainer: {
+    marginVertical: 15,
+    padding: 15,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+  },
+  imagePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E6E6FA',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  imagePickerButtonText: {
+    color: '#6B46C1',
+    marginLeft: 10,
+    fontWeight: '600',
+  },
+  imagePreviewContainer: {
+    marginTop: 15,
+    flexDirection: 'row',
+  },
+  imagePreviewWrapper: {
+    position: 'relative',
+    marginRight: 10,
+  },
+  imagePreview: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 15,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageTitle: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    color: 'white',
+    padding: 5,
+    textAlign: 'center',
+    fontSize: 12,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    width: '80%',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 15,
+  },
+  modalButton: {
+    backgroundColor: '#6B46C1',
+    padding: 10,
+    borderRadius: 5,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  listItem: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+  },
+  selectedListItem: {
+    backgroundColor: '#f0e6ff',
+  },
+  listItemTitle: {
+    fontSize: 16,
+    color: '#333',
+  },
+  closeButton: {
+    marginTop: 15,
+    padding: 10,
+    backgroundColor: '#6B46C1',
+    borderRadius: 5,
+    width: '100%',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    width: '90%',
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  collectionSkeletonCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 16,
+    padding: 12,
+    flexDirection: 'row',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  collectionSkeletonImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#E1E1E1',
+  },
+  collectionSkeletonContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  collectionSkeletonText: {
+    height: 20,
+    width: '60%',
+    backgroundColor: '#E1E1E1',
+    borderRadius: 4,
+  },
+  collectionItem: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  selectedCollectionItem: {
+    backgroundColor: '#8b4ae2',
+    borderColor: '#8b4ae2',
+  },
+  collectionText: {
+    color: '#000',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  selectedCollectionText: {
+    color: 'white',
+  },
+  collectionItemImage: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginRight: 8,
+  },
+  createButton: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginLeft: 10,
+  },
+  createButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  placeholderText: {
+    color: '#888',
+    fontStyle: 'italic',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 12,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  imageUploadContainer: {
+    marginVertical: 15,
+    padding: 15,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+  },
+  imagePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E6E6FA',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  imagePickerButtonText: {
+    color: '#6B46C1',
+    marginLeft: 10,
+    fontWeight: '600',
+  },
+  imagePreviewContainer: {
+    marginTop: 15,
+    flexDirection: 'row',
+  },
+  imagePreviewWrapper: {
+    position: 'relative',
+    marginRight: 10,
+  },
+  imagePreview: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 15,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageTitle: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    color: 'white',
+    padding: 5,
+    textAlign: 'center',
+    fontSize: 12,
+  },
+  mandatoryInput: {
+    borderColor: '#ddd',
+  },
+  mandatorySection: {
+    borderColor: '#ddd',
+    borderWidth: 1,
+  },
+  disabledButton: {
+    backgroundColor: '#cccccc',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 15,
+    color: '#000',
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 15,
+    fontSize: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  modalButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  createButton: {
+    backgroundColor: '#8b4ae2',
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  createButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  imagePickerButton: {
+    width: '100%',
+    height: 120,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    marginBottom: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 5,
+  },
+  imagePickerText: {
+    color: '#666',
+  },
+  mandatoryField: {
+    borderColor: '#ddd',
+  },
+  disabledButton: {
+    backgroundColor: '#cccccc',
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  uploadButton: {
+    backgroundColor: '#8b4ae2',
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  uploadButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });
-
-export default ProductUpload;

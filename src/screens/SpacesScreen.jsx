@@ -2,7 +2,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import React, {useCallback, useEffect, useState} from 'react';
 import {
-  Alert,
   Image,
   RefreshControl,
   ScrollView,
@@ -12,13 +11,32 @@ import {
   View,
 } from 'react-native';
 import BottomNavBar from '../components/BottomNavBar';
+import SkeletonLoader from '../components/SkeletonLoader';
+import Snackbar from '../components/Snackbar';
 
-const BASE_URL = 'http://13.49.68.11:3000';
+const BASE_URL = 'http://13.60.211.186:3000';
 
 const SpacesScreen = ({navigation}) => {
   const [spaces, setSpaces] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [snackbar, setSnackbar] = useState({
+    visible: false,
+    message: '',
+    type: 'success'
+  });
+
+  const showSnackbar = (message, type = 'success') => {
+    setSnackbar({
+      visible: true,
+      message,
+      type
+    });
+    // Hide snackbar after 3 seconds
+    setTimeout(() => {
+      setSnackbar(prev => ({...prev, visible: false}));
+    }, 3000);
+  };
 
   // Fetch spaces with basic details
   const fetchSpaces = useCallback(async () => {
@@ -66,10 +84,7 @@ const SpacesScreen = ({navigation}) => {
         data: error.response?.data,
         config: error.config,
       });
-      Alert.alert(
-        'Error',
-        'Unable to fetch spaces. Please check your internet connection and try again.',
-      );
+      showSnackbar('Unable to fetch spaces. Please check your internet connection and try again.', 'error');
       setSpaces([]);
       setLoading(false);
     }
@@ -91,7 +106,21 @@ const SpacesScreen = ({navigation}) => {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading Spaces...</Text>
+        <View style={styles.header}>
+          <SkeletonLoader width="50%" height={20} />
+        </View>
+        <View style={styles.spacesContainer}>
+          {[1, 2, 3, 4, 5, 6].map(key => (
+            <View key={key} style={styles.spaceCard}>
+              <SkeletonLoader width="100%" height={150} />
+              <View style={styles.spaceOverlay}>
+                <SkeletonLoader width="80%" height={20} style={{marginBottom: 8}} />
+                <SkeletonLoader width="40%" height={16} />
+              </View>
+            </View>
+          ))}
+        </View>
+        <BottomNavBar navigation={navigation} />
       </View>
     );
   }
@@ -112,13 +141,19 @@ const SpacesScreen = ({navigation}) => {
 
         {spaces.length === 0 ? (
           <View style={styles.emptyStateContainer}>
-            <Text style={styles.emptyStateText}>No spaces found</Text>
+            <Image 
+              source={require('../assets/images/space_empty_state.png')} 
+              style={styles.emptyStateImage}
+              resizeMode="contain"
+            />
+            <Text style={styles.emptyStateTitle}>No Spaces Yet</Text>
+            <Text style={styles.emptyStateDescription}>
+              Add your first product to begin organizing your space.
+            </Text>
             <TouchableOpacity
-              style={styles.createSpaceButton}
-              onPress={() => navigation.navigate('CreateSpace')}>
-              {/* <Text style={styles.createSpaceButtonText}>
-                Create First Space
-              </Text> */}
+              style={styles.addProductButton}
+              onPress={() => navigation.navigate('ProductUpload')}>
+              <Text style={styles.addProductButtonText}>Add Product</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -165,6 +200,7 @@ const SpacesScreen = ({navigation}) => {
       </ScrollView>
 
       <BottomNavBar navigation={navigation} />
+      <Snackbar visible={snackbar.visible} message={snackbar.message} type={snackbar.type} />
     </View>
   );
 };
@@ -195,11 +231,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 10,
     marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
     overflow: 'hidden',
   },
   spaceImage: {
@@ -227,27 +258,36 @@ const styles = StyleSheet.create({
   },
   emptyStateContainer: {
     flex: 1,
-    justifyContent: 'center', // Centers vertically
-    alignItems: 'center', // Centers horizontally
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 20,
-    position: 'absolute', // Positions the container relative to its parent
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    marginTop: 40,
   },
-  emptyStateText: {
-    fontSize: 18,
+  emptyStateImage: {
+    width: '80%',
+    height: 250,
+    marginBottom: 20,
+    borderRadius: 8,
+  },
+  emptyStateTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  emptyStateDescription: {
+    fontSize: 16,
+    textAlign: 'center',
     color: '#666',
     marginBottom: 20,
   },
-  createSpaceButton: {
+  addProductButton: {
     backgroundColor: '#6B46C1',
     paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
+    paddingHorizontal: 24,
+    borderRadius: 25,
   },
-  createSpaceButtonText: {
+  addProductButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',

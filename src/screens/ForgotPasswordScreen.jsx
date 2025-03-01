@@ -27,7 +27,7 @@ const BackgroundPattern = () => (
   </View>
 );
 
-function ForgotPasswordScreen({navigation}) {
+export const ForgotPasswordScreen = ({navigation}) => {
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState('');
 
@@ -120,8 +120,8 @@ function ForgotPasswordScreen({navigation}) {
       </View>
     </View>
   );
-}
-
+};
+export default ForgotPasswordScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -254,5 +254,3 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
-
-export default ForgotPasswordScreen;

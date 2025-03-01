@@ -27,9 +27,11 @@ import ProductUploadScreen from './src/screens/ProductUploadScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import ProductDetailsScreen from './src/screens/SingleProductScreen';
 import SpaceDetailsScreen from './src/screens/SpaceDetailsScreen';
-import SpaceScreen from './src/screens/SpaceScreen';
 import SpacesScreen from './src/screens/SpacesScreen';
 import VerifyScreen from './src/screens/verify';
+import AllProductsScreen from './src/screens/AllProductsScreen';
+import SubscriptionScreen from './src/screens/SubscriptionScreen';
+import FeedbackScreen from './src/screens/FeedbackScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -88,11 +90,7 @@ const AppStack = () => (
       component={SpacesScreen}
       options={{headerShown: false}}
     />
-    <Stack.Screen
-      name="Space"
-      component={SpaceScreen}
-      options={{headerShown: false}}
-    />
+
     <Stack.Screen
       name="IndividualSpace"
       component={IndividualSpaceScreen}
@@ -141,6 +139,27 @@ const AppStack = () => (
     <Stack.Screen
       name="OnlineProductSearch"
       component={OnlineProductSearchScreen}
+      options={{
+        headerShown: false,
+      }}
+    />
+    <Stack.Screen
+      name="AllProducts"
+      component={AllProductsScreen}
+      options={{
+        headerShown: false,
+      }}
+    />
+    <Stack.Screen
+      name="Subscription"
+      component={SubscriptionScreen}
+      options={{
+        headerShown: false,
+      }}
+    />
+    <Stack.Screen
+      name="Feedback"
+      component={FeedbackScreen}
       options={{
         headerShown: false,
       }}

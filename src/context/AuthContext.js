@@ -2,7 +2,7 @@ import React, {createContext, useState, useContext, useEffect} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
-const BASE_URL = 'https://13.49.68.11:3000';
+const BASE_URL = 'https://13.60.211.186:3000';
 const AuthContext = createContext();
 
 export const AuthProvider = ({children}) => {

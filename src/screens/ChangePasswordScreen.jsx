@@ -14,13 +14,11 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {useNavigation} from '@react-navigation/native';
 import Snackbar from 'react-native-snackbar';
 
-const BASE_URL = 'http://13.49.68.11:3000';
+const BASE_URL = 'http://13.60.211.186:3000';
 
-const ChangePasswordScreen = ({navigation}) => {
-  const nav = useNavigation();
+export const ChangePasswordScreen = ({navigation}) => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -122,7 +120,7 @@ const ChangePasswordScreen = ({navigation}) => {
       visible={showSuccessModal}
       onRequestClose={() => {
         setShowSuccessModal(false);
-        nav.navigate('Profile');
+        navigation.navigate('Profile');
       }}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalView}>
@@ -134,7 +132,7 @@ const ChangePasswordScreen = ({navigation}) => {
             style={styles.okButton}
             onPress={() => {
               setShowSuccessModal(false);
-              nav.navigate('Profile');
+              navigation.navigate('Profile');
             }}>
             <Text style={styles.okButtonText}>Okay</Text>
           </TouchableOpacity>
@@ -232,6 +230,8 @@ const ChangePasswordScreen = ({navigation}) => {
     </View>
   );
 };
+
+export default ChangePasswordScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -352,5 +352,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
-export default ChangePasswordScreen;

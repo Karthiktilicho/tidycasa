@@ -6,20 +6,21 @@ import {
   Image, 
   TouchableOpacity, 
   StatusBar, 
-  Alert,
   TextInput,
   Modal,
-  ActivityIndicator
+  ActivityIndicator,
+  ScrollView
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import BottomNavBar from '../components/BottomNavBar';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Snackbar from '../components/Snackbar';
 
-const BASE_URL = 'http://13.49.68.11:3000';
+const BASE_URL = 'http://13.60.211.186:3000';
 
-const ProfileScreen = ({ navigation, route }) => {
+export const ProfileScreen = ({ navigation, route }) => {
   const [userProfile, setUserProfile] = useState({
     username: '',
     email: '',
@@ -38,7 +39,24 @@ const ProfileScreen = ({ navigation, route }) => {
     email: '',
   });
   const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    visible: false,
+    message: '',
+    type: 'success'
+  });
   const { signOut } = useAuth();
+
+  const showSnackbar = (message, type = 'success') => {
+    setSnackbar({
+      visible: true,
+      message,
+      type
+    });
+    // Hide snackbar after 3 seconds
+    setTimeout(() => {
+      setSnackbar(prev => ({...prev, visible: false}));
+    }, 3000);
+  };
 
   const fetchProfile = async () => {
     try {
@@ -71,7 +89,7 @@ const ProfileScreen = ({ navigation, route }) => {
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
-      Alert.alert('Error', 'Failed to fetch profile details');
+      showSnackbar('Failed to fetch profile details', 'error');
     } finally {
       setLoading(false);
     }
@@ -100,11 +118,11 @@ const ProfileScreen = ({ navigation, route }) => {
       if (response.data && response.data.status === 'success') {
         setUserProfile(editedProfile);
         setIsEditing(false);
-        Alert.alert('Success', 'Profile updated successfully');
+        showSnackbar('Profile updated successfully', 'success');
       }
     } catch (error) {
       console.error('Error updating profile:', error);
-      Alert.alert('Error', 'Failed to update profile');
+      showSnackbar('Failed to update profile', 'error');
     } finally {
       setLoading(false);
     }
@@ -124,30 +142,21 @@ const ProfileScreen = ({ navigation, route }) => {
         'Content-Type': 'application/json'
       };
 
-      // Fetch spaces count
-      console.log('Fetching spaces...');
-      const spacesResponse = await axios.get(`${BASE_URL}/spaces/user`, { headers });
-      console.log('Spaces response:', spacesResponse.data);
-      const spacesCount = spacesResponse.data?.data?.length || 0;
+      // Single API call to get all stats
+      console.log('Fetching user stats...');
+      const response = await axios.get(`${BASE_URL}/products`, { headers });
+      console.log('Stats response:', response.data);
 
-      // Fetch products count
-      console.log('Fetching products...');
-      const productsResponse = await axios.get(`${BASE_URL}/products`, { headers });
-      console.log('Products response:', productsResponse.data);
-      const productsCount = productsResponse.data?.data?.length || 0;
+      // Access the correct data structure from API response
+      const data = response.data.data || {};
+      const stats = {
+        productsCount: data.totalCount || 0,
+        spacesCount: data.total_spaces || 0,
+        collectionsCount: data.total_collections || 0
+      };
 
-      // Fetch collections count
-      console.log('Fetching collections...');
-      const collectionsResponse = await axios.get(`${BASE_URL}/collections/user/collections`, { headers });
-      console.log('Collections response:', collectionsResponse.data);
-      const collectionsCount = collectionsResponse.data?.data?.length || 0;
-
-      console.log('Setting stats:', { spacesCount, productsCount, collectionsCount });
-      setUserStats({
-        spacesCount,
-        productsCount,
-        collectionsCount
-      });
+      setUserStats(stats);
+      console.log('Updated stats:', stats);
     } catch (error) {
       console.error('Error fetching user stats:', {
         message: error.message,
@@ -155,18 +164,13 @@ const ProfileScreen = ({ navigation, route }) => {
         status: error.response?.status
       });
       
-      // Set default values in case of error
       setUserStats({
         spacesCount: 0,
         productsCount: 0,
         collectionsCount: 0
       });
 
-      // Show error to user
-      Alert.alert(
-        'Error',
-        'Failed to fetch your stats. Please check your internet connection and try again.'
-      );
+      showSnackbar('Failed to fetch your stats. Please try again.', 'error');
     }
   };
 
@@ -197,7 +201,7 @@ const ProfileScreen = ({ navigation, route }) => {
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
-      Alert.alert('Error', 'Failed to fetch profile details');
+      showSnackbar('Failed to fetch profile details', 'error');
     } finally {
       setLoading(false);
     }
@@ -240,7 +244,7 @@ const ProfileScreen = ({ navigation, route }) => {
       navigation.replace('Login');
     } catch (error) {
       console.error('Logout error:', error);
-      Alert.alert('Error', 'Failed to logout');
+      showSnackbar('Failed to logout', 'error');
     }
   };
 
@@ -260,13 +264,8 @@ const ProfileScreen = ({ navigation, route }) => {
               style={[styles.icon, { tintColor: '#FFFFFF' }]}
             />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <TouchableOpacity onPress={() => setIsEditing(true)}>
-            <Image 
-              source={require('../assets/images/arrow_back.png')} 
-              style={[styles.icon, { tintColor: '#FFFFFF' }]}
-            />
-          </TouchableOpacity>
+          <View style={{flex: 1}} />
+          <View style={{width: 24}} />
         </View>
 
         <View style={styles.profileInfo}>
@@ -287,7 +286,10 @@ const ProfileScreen = ({ navigation, route }) => {
         <View style={styles.statsContainer}>
           <TouchableOpacity
             style={styles.statsBox}
-            onPress={() => navigation.navigate('Products')}>
+            onPress={() => {
+              console.log('Navigating to AllProducts');
+              navigation.navigate('AllProducts');
+            }}>
             <Image
               source={require('../assets/images/Product.png')}
               style={styles.statsIcon}
@@ -425,7 +427,7 @@ const ProfileScreen = ({ navigation, route }) => {
 
         <TouchableOpacity 
           style={styles.menuItem}
-          onPress={() => navigation.navigate('Subscriptions')}
+          onPress={() => navigation.navigate('Subscription')}
         >
           <View style={styles.menuLeft}>
             <Image 
@@ -459,9 +461,16 @@ const ProfileScreen = ({ navigation, route }) => {
       </View>
 
       <BottomNavBar navigation={navigation} currentScreen="Profile" />
+      <Snackbar
+        visible={snackbar.visible}
+        message={snackbar.message}
+        type={snackbar.type}
+      />
     </View>
   );
 };
+
+export default ProfileScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -481,11 +490,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     marginBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 20,
-    color: '#FFFFFF',
-    fontWeight: '600',
   },
   icon: {
     width: 24,
@@ -526,7 +530,7 @@ const styles = StyleSheet.create({
   statsBox: {
     backgroundColor: '#FFFFFF',
     borderRadius: 15,
-    padding: 15,
+    padding: 20,
     alignItems: 'center',
     width: '30%',
     height: 100,
@@ -592,10 +596,12 @@ const styles = StyleSheet.create({
     shadowOffset: {
       width: 0,
       height: 2,
+      
     },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 5,
+    elevation: 4,
+    borderRadius: 8,
   },
   logoutButtonText: {
     color: '#E53E3E',
@@ -659,5 +665,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
-export default ProfileScreen;

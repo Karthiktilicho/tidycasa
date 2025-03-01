@@ -1,29 +1,35 @@
 import React from "react";
 import { StyleSheet, View, Image } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 
 function Header() {
   return (
-    <View style={styles.header}> 
-      <Image source={require('./logo.png')} style={{width:160,height:30,marginTop:5,marginLeft:5}} /> 
-    </View>
+    <LinearGradient colors={['#6B46C1', '#9F7AEA']} style={styles.header}>
+      <View style={styles.headerTop}>
+        <Image
+          source={require('../assets/images/LogoHorizontal.png')}
+          style={[styles.logo, {tintColor: '#fff'}]}
+        />
+      </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   header: {
-    height: 60,
     paddingTop: 10,
-    backgroundColor: 'white',
-    borderBottomWidth: 0.5, 
-    borderBottomColor: 'gray', 
+    paddingBottom: 15,
+    paddingHorizontal: 20,
   },
-
-  title: {
-    marginLeft: 15,
-    textAlign: 'left',
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  logo: {
+    height: 30,
+    width: 120,
+    resizeMode: 'contain',
   }
 });
 
